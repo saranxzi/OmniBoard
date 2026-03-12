@@ -24,6 +24,7 @@ model Room {
   code      String   @unique
   name      String?
   isPrivate Boolean  @default(false)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -31,6 +32,8 @@ model Room {
   creator     User?    @relation("CreatedRooms", fields: [creatorId], references: [id], onDelete: Cascade)
 
   accessLists RoomAccess[]
+
+  @@index([code])
 }
 
 model RoomAccess {
