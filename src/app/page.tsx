@@ -36,7 +36,7 @@ export default function Lobby() {
 
         if (res.ok) {
             const data = await res.json();
-            router.push(`/board/${data.roomId}`);
+            router.push(`/board/${data.code}`);
         } else {
             console.error('Failed to create room');
             setIsCreating(false);
@@ -154,7 +154,7 @@ export default function Lobby() {
               <input
                 id="roomId"
                 type="text"
-                placeholder="Enter Room ID..."
+                placeholder="Enter Room Code (e.g. X7K9P2)"
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
                 className="flex-1 bg-white border-2 border-theme-light rounded-xl px-4 py-3 text-theme-dark focus:outline-none focus:border-theme-accent transition-colors font-mono placeholder:text-theme-dark/30"

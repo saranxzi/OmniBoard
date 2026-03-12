@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// Given a roomId and a userEmail, verify if the user has access.
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -11,29 +10,34 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
         }
 
-        const room = await prisma.room.findUnique({
-            where: { id: roomId },
-            include: { creator: true },
-        });
+        // Support both UUID and 6-char short code
+        const isShortCode = roomId.length <= 6;
+        const room = isShortCode
+            ? await prisma.room.findUnique({ where: { code: roomId.toUpperCase() }, include: { creator: true } })
+            : await prisma.room.findUnique({ where: { id: roomId }, include: { creator: true } });
 
         if (!room) {
             return NextResponse.json({ error: 'Room not found', allowed: false }, { status: 404 });
         }
 
+        // Public rooms — always allowed
         if (!room.isPrivate) {
-            return NextResponse.json({ allowed: true, isPrivate: false }, { status: 200 });
+            return NextResponse.json({ allowed: true, isPrivate: false, roomId: room.id, code: room.code }, { status: 200 });
         }
 
+        // Private rooms require authentication
         if (!userEmail) {
             return NextResponse.json({ error: 'Log in to access private rooms', allowed: false }, { status: 401 });
         }
 
-        if (room.creator?.email === userEmail) {
-            return NextResponse.json({ allowed: true, isPrivate: true, role: 'creator' }, { status: 200 });
+        // Creator always has access
+        if (room.creator?.email === userEmail.toLowerCase().trim()) {
+            return NextResponse.json({ allowed: true, isPrivate: true, role: 'creator', roomId: room.id, code: room.code }, { status: 200 });
         }
 
+        // Check access list
         const user = await prisma.user.findUnique({
-            where: { email: userEmail },
+            where: { email: userEmail.toLowerCase().trim() },
         });
 
         if (!user) {
@@ -53,8 +57,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Access Denied', allowed: false }, { status: 403 });
         }
 
-        return NextResponse.json({ allowed: true, isPrivate: true, role: 'guest' }, { status: 200 });
-
+        return NextResponse.json({ allowed: true, isPrivate: true, role: 'guest', roomId: room.id, code: room.code }, { status: 200 });
     } catch (error) {
         console.error('Room verification error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

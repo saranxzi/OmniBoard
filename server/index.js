@@ -18,17 +18,39 @@ const io = new Server(server, {
 // Room states: Map<roomId, Map<elementId, Element>>
 const rooms = new Map();
 
+// Track which room each socket is in
+const socketRooms = new Map(); // socketId -> roomId
+
+// Helper: broadcast the current user count for a room
+function emitUserCount(roomId) {
+    const sockets = io.sockets.adapter.rooms.get(roomId);
+    const count = sockets ? sockets.size : 0;
+
+    // Build list of connected user names
+    const users = [];
+    if (sockets) {
+        for (const sid of sockets) {
+            const meta = socketRooms.get(sid);
+            if (meta && meta.userName) {
+                users.push({ socketId: sid, name: meta.userName });
+            } else {
+                users.push({ socketId: sid, name: 'Guest' });
+            }
+        }
+    }
+
+    io.to(roomId).emit('room-users', { count, users });
+}
+
 // Memory Management: Delete rooms when they sit empty to prevent RAM bloating
 io.of("/").adapter.on("empty-room", (room) => {
-    // Only cleanup rooms that are actual Board Rooms (usually UUIDs, not single socket IDs)
-    if (rooms.has(room) && room.length > 20) { 
+    if (rooms.has(room) && room.length > 20) {
         console.log(`Room ${room} is empty. Scheduling memory cleanup...`);
-        // Wait 2 minutes. If no one rejoins, purge the room state.
         setTimeout(() => {
             const activeSockets = io.sockets.adapter.rooms.get(room);
             if (!activeSockets || activeSockets.size === 0) {
                 rooms.delete(room);
-                console.log(`♻️ Purged inactive room ${room} from memory to prevent bloat.`);
+                console.log(`♻️ Purged inactive room ${room} from memory.`);
             }
         }, 120000);
     }
@@ -37,9 +59,10 @@ io.of("/").adapter.on("empty-room", (room) => {
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('join-room', (roomId) => {
+    socket.on('join-room', ({ roomId, userName }) => {
         socket.join(roomId);
-        console.log(`User ${socket.id} joined room ${roomId}`);
+        socketRooms.set(socket.id, { roomId, userName: userName || 'Guest' });
+        console.log(`${userName || 'Guest'} (${socket.id}) joined room ${roomId}`);
 
         // Send existing room state to the new user
         if (rooms.has(roomId)) {
@@ -48,17 +71,16 @@ io.on('connection', (socket) => {
         } else {
             rooms.set(roomId, new Map());
         }
+
+        // Broadcast updated user count
+        emitUserCount(roomId);
     });
 
     socket.on('draw-element', ({ roomId, element }) => {
         if (!rooms.has(roomId)) {
             rooms.set(roomId, new Map());
         }
-        
-        // Save to server state
         rooms.get(roomId).set(element.id, element);
-
-        // Broadcast to everyone else in the room
         socket.to(roomId).emit('update-element', element);
     });
 
@@ -86,9 +108,16 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
-        // Let rooms know a cursor dropped
-        // For a tighter implementation, track which room the socket was in and emit 'cursor-remove'
+        const meta = socketRooms.get(socket.id);
+        if (meta) {
+            const { roomId } = meta;
+            console.log(`${meta.userName} (${socket.id}) disconnected from room ${roomId}`);
+            socketRooms.delete(socket.id);
+
+            // Broadcast cursor removal and updated count
+            io.to(roomId).emit('cursor-remove', socket.id);
+            emitUserCount(roomId);
+        }
     });
 });
 

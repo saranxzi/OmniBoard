@@ -18,7 +18,6 @@ export const isPointOnLine = (x1: number, y1: number, x2: number, y2: number, x:
 };
 
 export const getElementAtPosition = (x: number, y: number, elements: Element[]): Element | null => {
-    // Loop backwards to hit the top-most element first
     for (let i = elements.length - 1; i >= 0; i--) {
         const element = elements[i];
         const { x1, y1, x2, y2, type, points } = element;
@@ -29,14 +28,32 @@ export const getElementAtPosition = (x: number, y: number, elements: Element[]):
             const minY = Math.min(y1, y2);
             const maxY = Math.max(y1, y2);
             if (x >= minX && x <= maxX && y >= minY && y <= maxY) return element;
-        } else if (type === 'line') {
+        } else if (type === 'ellipse') {
+            // Check if point is inside the ellipse
+            const cx = (x1 + x2) / 2;
+            const cy = (y1 + y2) / 2;
+            const rx = Math.abs(x2 - x1) / 2;
+            const ry = Math.abs(y2 - y1) / 2;
+            if (rx > 0 && ry > 0) {
+                const normalized = Math.pow(x - cx, 2) / Math.pow(rx, 2) + Math.pow(y - cy, 2) / Math.pow(ry, 2);
+                if (normalized <= 1) return element;
+            }
+        } else if (type === 'diamond') {
+            // Check if point is inside the diamond (rotated rectangle)
+            const cx = (x1 + x2) / 2;
+            const cy = (y1 + y2) / 2;
+            const hw = Math.abs(x2 - x1) / 2;
+            const hh = Math.abs(y2 - y1) / 2;
+            if (hw > 0 && hh > 0) {
+                const normalized = Math.abs(x - cx) / hw + Math.abs(y - cy) / hh;
+                if (normalized <= 1) return element;
+            }
+        } else if (type === 'line' || type === 'arrow') {
             if (isPointOnLine(x1, y1, x2, y2, x, y, 5)) return element;
         } else if (type === 'pencil' && points) {
-            // For pencil, check if point is near any of the stroke points
             const isHit = points.some(point => distance(point, { x, y }) < 10);
             if (isHit) return element;
         } else if (type === 'text' && element.text) {
-            // Very rough hit detection for text
             const width = element.text.length * 14;
             const height = 24;
             if (x >= x1 && x <= x1 + width && y >= y1 - height && y <= y1) return element;
@@ -71,19 +88,32 @@ export function createElement(
         return { id, type: 'text', x1, y1, x2, y2, color, strokeWidth, text: text || '' };
     }
 
-    let roughElement;
+    let roughElement: Drawable | undefined;
+    const opts = { stroke: color, strokeWidth, roughness: 1.5 };
+
     if (type === 'rectangle') {
-        roughElement = generator.rectangle(x1, y1, x2 - x1, y2 - y1, {
-            stroke: color,
-            strokeWidth: strokeWidth,
-            roughness: 1.5,
-        });
+        roughElement = generator.rectangle(x1, y1, x2 - x1, y2 - y1, opts);
+    } else if (type === 'ellipse') {
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        const width = Math.abs(x2 - x1);
+        const height = Math.abs(y2 - y1);
+        roughElement = generator.ellipse(cx, cy, width, height, opts);
+    } else if (type === 'diamond') {
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        const hw = (x2 - x1) / 2;
+        const hh = (y2 - y1) / 2;
+        roughElement = generator.polygon([
+            [cx, cy - hh],     // top
+            [cx + hw, cy],     // right
+            [cx, cy + hh],     // bottom
+            [cx - hw, cy],     // left
+        ], opts);
+    } else if (type === 'arrow') {
+        roughElement = generator.line(x1, y1, x2, y2, opts);
     } else if (type === 'line') {
-        roughElement = generator.line(x1, y1, x2, y2, {
-            stroke: color,
-            strokeWidth: strokeWidth,
-            roughness: 1.5,
-        });
+        roughElement = generator.line(x1, y1, x2, y2, opts);
     }
 
     return { id, type: type as Tool, x1, y1, x2, y2, color, strokeWidth, text, roughElement };
@@ -91,13 +121,11 @@ export function createElement(
 
 // Check if a given coordinate is clicking inside an 8x8 resize handle of the selected element
 export const getResizeHandleHit = (x: number, y: number, element: Element, zoom: number): ResizeHandle => {
-    // We don't support resizing pencil strokes or text directly yet (only shapes & lines)
     if (element.type === 'pencil' || element.type === 'text') return null;
 
     const { x1, y1, x2, y2 } = element;
-    const handleSize = 8 / zoom; // Match the visual size of the drawn handles
+    const handleSize = 8 / zoom;
 
-    // Check hit purely by bounds intersection
     const isInside = (hx: number, hy: number) => {
         return Math.abs(x - hx) <= handleSize && Math.abs(y - hy) <= handleSize;
     };

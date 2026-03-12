@@ -4,10 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Toolbar from '@/components/Toolbar';
-import UndoRedo from '@/components/UndoRedo';
-import ZoomControls from '@/components/ZoomControls';
-import ExportImage from '@/components/ExportImage';
 import { useAuthStore } from '@/store/useAuthStore';
+import WorkspaceSettings from '@/components/WorkspaceSettings';
 import { Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -25,6 +23,9 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
     const { user } = useAuthStore();
     const router = useRouter();
     const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+    const [resolvedRoomId, setResolvedRoomId] = useState<string | null>(null);
+    const [roomCode, setRoomCode] = useState<string | null>(null);
+    const [isPrivate, setIsPrivate] = useState(false);
 
     useEffect(() => {
         const verifyAccess = async () => {
@@ -36,6 +37,10 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                 });
 
                 if (res.ok) {
+                    const data = await res.json();
+                    setResolvedRoomId(data.roomId);
+                    setRoomCode(data.code);
+                    setIsPrivate(data.isPrivate || false);
                     setIsAuthorized(true);
                 } else {
                     setIsAuthorized(false);
@@ -47,7 +52,7 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
         };
 
         verifyAccess();
-    }, [params.roomId, user, router]);
+    }, [params.roomId, user]);
 
     if (isAuthorized === null) {
         return (
@@ -82,14 +87,22 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
 
     return (
         <main className="w-full h-screen overflow-hidden m-0 p-0 relative bg-theme-lightest transition-colors duration-500">
-            {/* Decorative background for the board */}
+            {/* Decorative background */}
             <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-theme-light/40 via-theme-lightest to-transparent pointer-events-none" />
 
+            {/* Room code badge */}
+            {roomCode && (
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-white/80 backdrop-blur-2xl rounded-xl shadow-sm border border-theme-light px-4 py-1.5 flex items-center gap-2">
+                    <span className="text-xs text-theme-dark/50 font-medium">Room</span>
+                    <span className="text-sm font-mono font-black text-theme-dark tracking-widest">{roomCode}</span>
+                </div>
+            )}
+
+            {/* Workspace Settings - rendered at top level outside canvas stacking context */}
+            {roomCode && <WorkspaceSettings roomCode={roomCode} isPrivate={isPrivate} />}
+
             <div className="relative z-10 w-full h-full">
-                <UndoRedo />
-                <ZoomControls />
-                <ExportImage />
-                <Board />
+                {resolvedRoomId && <Board key={resolvedRoomId} />}
                 <Toolbar />
             </div>
         </main>

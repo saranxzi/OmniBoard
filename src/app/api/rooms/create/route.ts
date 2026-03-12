@@ -1,6 +1,26 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Generate a random 6-character alphanumeric code (uppercase + digits)
+function generateCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed I/O/0/1 to avoid confusion
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// Generate a unique code with collision retry
+async function generateUniqueCode(): Promise<string> {
+    for (let attempt = 0; attempt < 10; attempt++) {
+        const code = generateCode();
+        const existing = await prisma.room.findUnique({ where: { code } });
+        if (!existing) return code;
+    }
+    throw new Error('Failed to generate unique room code');
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -9,20 +29,25 @@ export async function POST(req: Request) {
         let creatorId = null;
 
         if (creatorEmail && creatorName) {
-            // Upsert the User who created this room
             const creator = await prisma.user.upsert({
-                where: { email: creatorEmail },
-                update: { name: creatorName },
-                create: { email: creatorEmail, name: creatorName },
+                where: { email: creatorEmail.toLowerCase().trim() },
+                update: { name: creatorName.trim() },
+                create: {
+                    email: creatorEmail.toLowerCase().trim(),
+                    name: creatorName.trim(),
+                    password: '', // Creator already exists via register flow
+                },
             });
             creatorId = creator.id;
         }
 
-        // Create the room
+        const code = await generateUniqueCode();
+
         const room = await prisma.room.create({
             data: {
+                code,
                 isPrivate: isPrivate ?? false,
-                creatorId: creatorId,
+                creatorId,
             },
         });
 
@@ -31,9 +56,13 @@ export async function POST(req: Request) {
             const users = await Promise.all(
                 allowedEmails.map(async (email: string) => {
                     return prisma.user.upsert({
-                        where: { email },
+                        where: { email: email.toLowerCase().trim() },
                         update: {},
-                        create: { email, name: email.split('@')[0] }, 
+                        create: {
+                            email: email.toLowerCase().trim(),
+                            name: email.split('@')[0],
+                            password: '',
+                        },
                     });
                 })
             );
@@ -47,7 +76,7 @@ export async function POST(req: Request) {
             });
         }
 
-        return NextResponse.json({ roomId: room.id }, { status: 201 });
+        return NextResponse.json({ roomId: room.id, code: room.code }, { status: 201 });
     } catch (error) {
         console.error('Room creation error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

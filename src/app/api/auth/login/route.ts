@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-
-const DB_PATH = path.join(process.cwd(), 'users.json');
-
-function getUsers() {
-    if (!fs.existsSync(DB_PATH)) {
-        return [];
-    }
-    const data = fs.readFileSync(DB_PATH, 'utf-8');
-    return JSON.parse(data);
-}
+import prisma from '@/lib/prisma';
+import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
     try {
@@ -18,18 +8,32 @@ export async function POST(req: Request) {
         const { email, password } = body;
 
         if (!email || !password) {
-            return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+            return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
         }
 
-        const users = getUsers();
-        const user = users.find((u: any) => u.email === email && u.password === password);
+        // Look up user by email (case-insensitive)
+        const user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase().trim() },
+        });
 
+        // Generic error to prevent email enumeration
         if (!user) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
 
-        return NextResponse.json({ success: true, user: { name: user.name, email: user.email } });
-    } catch (e: any) {
-        return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 });
+        // Compare password against bcrypt hash
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) {
+            return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        }
+
+        // Never return password hash
+        return NextResponse.json({
+            success: true,
+            user: { name: user.name, email: user.email },
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

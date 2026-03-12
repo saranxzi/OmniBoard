@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Drawable } from 'roughjs/bin/core';
 
-export type Tool = 'select' | 'rectangle' | 'line' | 'pencil' | 'text' | 'eraser';
+export type Tool = 'select' | 'rectangle' | 'ellipse' | 'diamond' | 'line' | 'arrow' | 'pencil' | 'text' | 'eraser';
 
 export type Point = { x: number; y: number };
 

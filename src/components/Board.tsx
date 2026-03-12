@@ -35,13 +35,15 @@ export default function Board() {
     
     // Multiplayer Cursors
     const [cursors, setCursors] = useState<Record<string, { socketId: string, x: number, y: number, user: any }>>({});
+    // Active users in the room
+    const [roomUsers, setRoomUsers] = useState<{ count: number, users: { socketId: string, name: string }[] }>({ count: 0, users: [] });
 
     // WebSocket Initialization
     useEffect(() => {
         const socket = getSocket();
         socket.connect();
         
-        socket.emit('join-room', roomId);
+        socket.emit('join-room', { roomId, userName: user?.name || 'Guest' });
 
         socket.on('init-room', (serverElements: Element[]) => {
             setElements(serverElements);
@@ -61,7 +63,6 @@ export default function Board() {
 
         socket.on('remove-element', (elementId: string) => {
             setElements((prev) => prev.filter(el => el.id !== elementId), true);
-            // Also deselect if it was the selected element
             if (useBoardStore.getState().selectedElement?.id === elementId) {
                 setSelectedElement(null);
             }
@@ -74,8 +75,18 @@ export default function Board() {
 
         socket.on('cursor-update', (data) => {
             setCursors(prev => ({ ...prev, [data.socketId]: data }));
-            // Optional: Automatically remove cursors after inactivity
-            // Clear timeout logic would go here
+        });
+
+        socket.on('cursor-remove', (socketId: string) => {
+            setCursors(prev => {
+                const next = { ...prev };
+                delete next[socketId];
+                return next;
+            });
+        });
+
+        socket.on('room-users', (data: { count: number, users: { socketId: string, name: string }[] }) => {
+            setRoomUsers(data);
         });
 
         return () => {
@@ -85,8 +96,10 @@ export default function Board() {
             socket.off('remove-element');
             socket.off('canvas-cleared');
             socket.off('cursor-update');
+            socket.off('cursor-remove');
+            socket.off('room-users');
         };
-    }, [roomId, setElements, setSelectedElement]);
+    }, [roomId, setElements, setSelectedElement, user]);
 
     // Convert screen coordinates to canvas world coordinates
     const getMouseCoordinates = (clientX: number, clientY: number) => {
@@ -161,6 +174,27 @@ export default function Board() {
                 element.roughElement.sets.forEach(() => {
                     rc.draw({ ...element.roughElement, options: tempOptions } as Drawable);
                 });
+
+                // Draw arrowhead for arrow type
+                if (element.type === 'arrow') {
+                    const { x1, y1, x2, y2 } = element;
+                    const angle = Math.atan2(y2 - y1, x2 - x1);
+                    const headLength = 15;
+                    ctx.beginPath();
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(
+                        x2 - headLength * Math.cos(angle - Math.PI / 6),
+                        y2 - headLength * Math.sin(angle - Math.PI / 6)
+                    );
+                    ctx.moveTo(x2, y2);
+                    ctx.lineTo(
+                        x2 - headLength * Math.cos(angle + Math.PI / 6),
+                        y2 - headLength * Math.sin(angle + Math.PI / 6)
+                    );
+                    ctx.strokeStyle = displayColor;
+                    ctx.lineWidth = element.strokeWidth;
+                    ctx.stroke();
+                }
             }
 
             if (selectedElement && element.id === selectedElement.id) {
