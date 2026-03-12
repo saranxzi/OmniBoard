@@ -23,7 +23,6 @@ export type Element = {
 };
 
 interface BoardState {
-    theme: 'light' | 'dark';
     activeTool: Tool;
     currentColor: string;
     currentStrokeWidth: number;
@@ -33,8 +32,6 @@ interface BoardState {
     panOffset: Point;
     zoom: number;
     selectedElement: Element | null;
-    setTheme: (theme: 'light' | 'dark') => void;
-    toggleTheme: () => void;
     setActiveTool: (tool: Tool) => void;
     setCurrentColor: (color: string) => void;
     setCurrentStrokeWidth: (width: number) => void;
@@ -48,9 +45,8 @@ interface BoardState {
 }
 
 export const useBoardStore = create<BoardState>((set) => ({
-    theme: 'light',
     activeTool: 'pencil',
-    currentColor: '#1e293b', // slate-800
+    currentColor: '#424874', // theme-dark
     currentStrokeWidth: 4,
     elements: [],
     history: [[]],
@@ -58,8 +54,6 @@ export const useBoardStore = create<BoardState>((set) => ({
     panOffset: { x: 0, y: 0 },
     zoom: 1,
     selectedElement: null,
-    setTheme: (theme) => set({ theme }),
-    toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
     setActiveTool: (tool) => set({ activeTool: tool, selectedElement: null }),
     setCurrentColor: (color) => set({ currentColor: color }),
     setCurrentStrokeWidth: (width) => set({ currentStrokeWidth: width }),

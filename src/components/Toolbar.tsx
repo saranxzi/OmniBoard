@@ -36,10 +36,10 @@ export default function Toolbar() {
 
     return (
         <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
             transition={{ duration: 0.4 }}
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4"
+            className="fixed bottom-8 left-1/2 z-50 flex flex-col items-center gap-4 w-fit"
         >
             {/* Colors & Thickness (Only show if drawing/text tool) */}
             {(activeTool !== 'select' && activeTool !== 'eraser') && (

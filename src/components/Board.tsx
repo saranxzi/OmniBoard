@@ -22,7 +22,7 @@ export default function Board() {
     const {
         elements, setElements, activeTool, setActiveTool, panOffset,
         setPanOffset, zoom, setZoom, selectedElement, setSelectedElement,
-        currentColor, currentStrokeWidth, theme
+        currentColor, currentStrokeWidth
     } = useBoardStore();
 
     const [isDrawing, setIsDrawing] = useState(false);
@@ -96,13 +96,7 @@ export default function Board() {
         };
     };
 
-    useEffect(() => {
-        if (theme === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, [theme]);
+
 
     useLayoutEffect(() => {
         const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -216,7 +210,7 @@ export default function Board() {
         });
 
         ctx.restore();
-    }, [elements, panOffset, zoom, selectedElement, theme]);
+    }, [elements, panOffset, zoom, selectedElement]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

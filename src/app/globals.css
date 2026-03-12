@@ -4,18 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #f8fafc;
-  /* slate-50 */
-  --foreground: #0f172a;
-  /* slate-900 */
-}
-
 body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  /* Prevent scrolling for the canvas */
-  color: var(--foreground);
-  background: var(--background);
+  color: #424874;
+  background: #F4EEFF;
 }

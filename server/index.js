@@ -18,6 +18,22 @@ const io = new Server(server, {
 // Room states: Map<roomId, Map<elementId, Element>>
 const rooms = new Map();
 
+// Memory Management: Delete rooms when they sit empty to prevent RAM bloating
+io.of("/").adapter.on("empty-room", (room) => {
+    // Only cleanup rooms that are actual Board Rooms (usually UUIDs, not single socket IDs)
+    if (rooms.has(room) && room.length > 20) { 
+        console.log(`Room ${room} is empty. Scheduling memory cleanup...`);
+        // Wait 2 minutes. If no one rejoins, purge the room state.
+        setTimeout(() => {
+            const activeSockets = io.sockets.adapter.rooms.get(room);
+            if (!activeSockets || activeSockets.size === 0) {
+                rooms.delete(room);
+                console.log(`♻️ Purged inactive room ${room} from memory to prevent bloat.`);
+            }
+        }, 120000);
+    }
+});
+
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 

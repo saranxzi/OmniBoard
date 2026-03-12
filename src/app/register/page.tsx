@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { UserPlus, ArrowLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -39,65 +40,73 @@ export default function RegisterPage() {
     };
 
     return (
-        <main className="w-full h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-[#121212] relative overflow-hidden">
-            {/* Decorative Background */}
-            <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100/40 via-slate-50/20 to-transparent dark:from-indigo-900/20 dark:via-[#121212]/20 dark:to-transparent pointer-events-none" />
+        <main className="w-full h-screen flex flex-col items-center justify-center bg-theme-lightest relative overflow-hidden">
+            {/* Animated Background Blobs */}
+            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/3 -left-20 w-80 h-80 bg-theme-light rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob" />
+                <div className="absolute bottom-1/3 -right-20 w-80 h-80 bg-theme-accent rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style={{ animationDelay: '2s' }} />
+            </div>
 
-            <Link href="/" className="absolute top-8 left-8 z-20 flex items-center gap-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors font-medium">
+            <Link href="/" className="absolute top-8 left-8 z-20 flex items-center gap-2 text-theme-dark/60 hover:text-theme-dark transition-colors font-medium">
                 <ArrowLeft className="w-4 h-4" />
                 Back to Lobby
             </Link>
 
-            <div className="relative z-10 w-full max-w-md bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-white/50 dark:border-slate-700/50 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)]">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="relative z-10 w-full max-w-md bg-white/70 backdrop-blur-xl border border-white p-8 rounded-[2rem] shadow-xl shadow-theme-dark/5"
+            >
                 <div className="flex justify-center mb-6">
-                    <div className="p-3 bg-indigo-100 dark:bg-indigo-500/20 rounded-2xl text-indigo-600 dark:text-indigo-400">
+                    <div className="p-3 bg-theme-light rounded-2xl text-theme-dark">
                         <UserPlus className="w-8 h-8" />
                     </div>
                 </div>
 
-                <h1 className="text-2xl font-bold text-center text-slate-800 dark:text-white mb-2">Create an Account</h1>
-                <p className="text-center text-slate-500 dark:text-slate-400 mb-6 font-medium">Join OmniBoard to save your workspaces</p>
+                <h1 className="text-2xl font-black text-center text-theme-dark mb-2">Create an Account</h1>
+                <p className="text-center text-theme-dark/60 mb-6 font-medium">Join OmniBoard to save your workspaces</p>
 
                 {error && (
-                    <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-xl text-sm font-medium text-center">
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-500 rounded-xl text-sm font-medium text-center">
                         {error}
                     </div>
                 )}
 
                 <form className="flex flex-col gap-4" onSubmit={handleRegister}>
                     <div>
-                        <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" htmlFor="name">Full Name</label>
+                        <label className="block text-sm font-bold text-theme-dark mb-1.5" htmlFor="name">Full Name</label>
                         <input
                             type="text"
                             id="name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-400"
+                            className="w-full bg-white border-2 border-theme-light rounded-xl px-4 py-3 text-theme-dark focus:outline-none focus:border-theme-accent transition-colors placeholder:text-theme-dark/30"
                             placeholder="John Doe"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" htmlFor="email">Email</label>
+                        <label className="block text-sm font-bold text-theme-dark mb-1.5" htmlFor="email">Email</label>
                         <input
                             type="email"
                             id="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-400"
+                            className="w-full bg-white border-2 border-theme-light rounded-xl px-4 py-3 text-theme-dark focus:outline-none focus:border-theme-accent transition-colors placeholder:text-theme-dark/30"
                             placeholder="you@example.com"
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1.5" htmlFor="password">Password</label>
+                        <label className="block text-sm font-bold text-theme-dark mb-1.5" htmlFor="password">Password</label>
                         <input
                             type="password"
                             id="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-slate-400"
+                            className="w-full bg-white border-2 border-theme-light rounded-xl px-4 py-3 text-theme-dark focus:outline-none focus:border-theme-accent transition-colors placeholder:text-theme-dark/30"
                             placeholder="••••••••"
                         />
                     </div>
@@ -105,18 +114,19 @@ export default function RegisterPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3 rounded-xl font-semibold shadow-lg transition-all hover:shadow-xl hover:scale-[1.02] flex justify-center items-center">
+                        className="w-full mt-4 bg-theme-dark hover:bg-theme-dark/90 disabled:opacity-50 text-white py-3 rounded-xl font-bold shadow-md transition-all hover:shadow-lg flex justify-center items-center"
+                    >
                         {loading ? 'Signing up...' : 'Sign Up'}
                     </button>
                 </form>
 
-                <p className="text-center mt-6 text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-center mt-6 text-sm text-theme-dark/60">
                     Already have an account?{' '}
-                    <Link href="/login" className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline">
+                    <Link href="/login" className="text-theme-accent font-bold hover:underline">
                         Log in
                     </Link>
                 </p>
-            </div>
+            </motion.div>
         </main>
     );
 }
