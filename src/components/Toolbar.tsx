@@ -1,7 +1,8 @@
 'use client';
 
-import { MousePointer2, Pencil, Square, Minus, Type, Eraser, Moon, Sun } from 'lucide-react';
+import { MousePointer2, Pencil, Square, Minus, Type, Eraser } from 'lucide-react';
 import { useBoardStore, Tool } from '@/store/useBoardStore';
+import { motion } from 'framer-motion';
 
 const TOOLS: { type: Tool; icon: React.ElementType; label: string }[] = [
     { type: 'select', icon: MousePointer2, label: 'Select' },
@@ -13,7 +14,7 @@ const TOOLS: { type: Tool; icon: React.ElementType; label: string }[] = [
 ];
 
 const COLORS = [
-    { name: 'Slate', value: '#1e293b' },
+    { name: 'Dark Theme', value: '#424874' },
     { name: 'Red', value: '#ef4444' },
     { name: 'Blue', value: '#3b82f6' },
     { name: 'Green', value: '#22c55e' },
@@ -30,59 +31,33 @@ export default function Toolbar() {
     const {
         activeTool, setActiveTool,
         currentColor, setCurrentColor,
-        currentStrokeWidth, setCurrentStrokeWidth,
-        theme, toggleTheme
+        currentStrokeWidth, setCurrentStrokeWidth
     } = useBoardStore();
 
-    const getThemeAwareColor = (color: string) => {
-        if (color === '#1e293b' && theme === 'dark') return '#f8fafc';
-        if (color === '#f8fafc' && theme === 'light') return '#1e293b';
-        return color;
-    };
-
     return (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4">
-            {/* Tools */}
-            <div className="bg-white/70 dark:bg-slate-800/70 hover:bg-white/90 dark:hover:bg-slate-800/90 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/50 dark:border-slate-700/50 p-2 flex items-center gap-2 transition-colors duration-300">
-                {TOOLS.map((tool) => (
-                    <button
-                        key={tool.type}
-                        onClick={() => setActiveTool(tool.type)}
-                        className={`p-3 rounded-xl transition-all ${activeTool === tool.type
-                            ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400 shadow-sm'
-                            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100'
-                            }`}
-                        title={tool.label}
-                    >
-                        <tool.icon className="w-5 h-5" />
-                    </button>
-                ))}
-
-                <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 mx-1" />
-                
-
-                <button
-                    onClick={toggleTheme}
-                    className="p-3 rounded-xl transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100"
-                    title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                >
-                    {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </button>
-            </div>
-
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4"
+        >
             {/* Colors & Thickness (Only show if drawing/text tool) */}
             {(activeTool !== 'select' && activeTool !== 'eraser') && (
-                <div className="bg-white/70 dark:bg-slate-800/70 hover:bg-white/90 dark:hover:bg-slate-800/90 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/50 dark:border-slate-700/50 p-2 flex items-center gap-4 transition-colors duration-300">
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    className="bg-white/80 hover:bg-white backdrop-blur-2xl rounded-2xl shadow-xl shadow-theme-dark/10 border border-theme-light p-2 flex items-center gap-4 transition-colors duration-300"
+                >
 
                     {/* Colors */}
-                    <div className="flex items-center gap-2 border-r border-slate-200/50 dark:border-slate-700/50 pr-4">
+                    <div className="flex items-center gap-3 border-r border-theme-light pr-5">
                         {COLORS.map((color) => (
                             <button
                                 key={color.value}
                                 onClick={() => setCurrentColor(color.value)}
-                                className={`w-8 h-8 rounded-full border-2 transition-transform ${currentColor === color.value ? 'scale-110 border-blue-500 shadow-md' : 'border-slate-200/50 dark:border-slate-700 hover:scale-105'
+                                className={`w-8 h-8 rounded-full border-2 transition-all ${currentColor === color.value ? 'scale-110 border-theme-accent shadow-md shadow-theme-accent/30' : 'border-transparent hover:scale-105 hover:border-theme-light'
                                     }`}
-                                style={{ backgroundColor: getThemeAwareColor(color.value) }}
+                                style={{ backgroundColor: color.value }}
                                 title={color.name}
                             />
                         ))}
@@ -94,19 +69,44 @@ export default function Toolbar() {
                             <button
                                 key={width.value}
                                 onClick={() => setCurrentStrokeWidth(width.value)}
-                                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${currentStrokeWidth === width.value ? 'bg-blue-100 dark:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                                className={`w-9 h-9 flex items-center justify-center transition-all rounded-full ${currentStrokeWidth === width.value ? 'bg-theme-light shadow-sm' : 'hover:bg-theme-lightest'
                                     }`}
                                 title={width.name}
                             >
                                 <div
-                                    className="bg-slate-800 dark:bg-slate-200 rounded-full"
+                                    className="bg-theme-dark rounded-full"
                                     style={{ width: '100%', height: `${width.value}px`, maxWidth: '20px' }}
                                 />
                             </button>
                         ))}
                     </div>
-                </div>
+                </motion.div>
             )}
-        </div>
+
+            {/* Tools */}
+            <div className="bg-white/80 hover:bg-white backdrop-blur-2xl rounded-2xl shadow-xl shadow-theme-dark/10 border border-theme-light p-2 flex items-center gap-2 transition-colors duration-300">
+                {TOOLS.map((tool) => (
+                    <button
+                        key={tool.type}
+                        onClick={() => setActiveTool(tool.type)}
+                        className={`relative p-3 rounded-xl transition-all ${activeTool === tool.type
+                            ? 'text-theme-dark'
+                            : 'text-theme-dark/50 hover:bg-theme-lightest hover:text-theme-dark'
+                            }`}
+                        title={tool.label}
+                    >
+                        {activeTool === tool.type && (
+                            <motion.div 
+                                layoutId="activeToolBg"
+                                className="absolute inset-0 bg-theme-light rounded-xl shadow-sm border border-theme-light"
+                                initial={false}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            />
+                        )}
+                        <tool.icon className="w-5 h-5 relative z-10" />
+                    </button>
+                ))}
+            </div>
+        </motion.div>
     );
 }

@@ -1,16 +1,24 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { Drawable } from 'roughjs/bin/core';
 import { useBoardStore, Element, Point, Tool } from '@/store/useBoardStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { getSocket } from '@/lib/socket';
 import getStroke from 'perfect-freehand';
 import {
     distance, isPointOnLine, getElementAtPosition,
     getSvgPathFromStroke, createElement, getResizeHandleHit, ResizeHandle
 } from '@/utils/board';
 import rough from 'roughjs';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Board() {
+    const params = useParams();
+    const roomId = params.roomId as string;
+    const { user } = useAuthStore();
+
     const {
         elements, setElements, activeTool, setActiveTool, panOffset,
         setPanOffset, zoom, setZoom, selectedElement, setSelectedElement,
@@ -24,6 +32,61 @@ export default function Board() {
     const [hoverHandle, setHoverHandle] = useState<ResizeHandle>(null);
     const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
     const [writingPosition, setWritingPosition] = useState<{ id: string; x: number; y: number } | null>(null);
+    
+    // Multiplayer Cursors
+    const [cursors, setCursors] = useState<Record<string, { socketId: string, x: number, y: number, user: any }>>({});
+
+    // WebSocket Initialization
+    useEffect(() => {
+        const socket = getSocket();
+        socket.connect();
+        
+        socket.emit('join-room', roomId);
+
+        socket.on('init-room', (serverElements: Element[]) => {
+            setElements(serverElements);
+        });
+
+        socket.on('update-element', (element: Element) => {
+            setElements((prev) => {
+                const index = prev.findIndex(el => el.id === element.id);
+                if (index !== -1) {
+                    const newElements = [...prev];
+                    newElements[index] = element;
+                    return newElements;
+                }
+                return [...prev, element];
+            }, true);
+        });
+
+        socket.on('remove-element', (elementId: string) => {
+            setElements((prev) => prev.filter(el => el.id !== elementId), true);
+            // Also deselect if it was the selected element
+            if (useBoardStore.getState().selectedElement?.id === elementId) {
+                setSelectedElement(null);
+            }
+        });
+
+        socket.on('canvas-cleared', () => {
+            setElements([], true);
+            setSelectedElement(null);
+        });
+
+        socket.on('cursor-update', (data) => {
+            setCursors(prev => ({ ...prev, [data.socketId]: data }));
+            // Optional: Automatically remove cursors after inactivity
+            // Clear timeout logic would go here
+        });
+
+        return () => {
+            socket.disconnect();
+            socket.off('init-room');
+            socket.off('update-element');
+            socket.off('remove-element');
+            socket.off('canvas-cleared');
+            socket.off('cursor-update');
+        };
+    }, [roomId, setElements, setSelectedElement]);
 
     // Convert screen coordinates to canvas world coordinates
     const getMouseCoordinates = (clientX: number, clientY: number) => {
@@ -51,15 +114,11 @@ export default function Board() {
 
         ctx.save();
 
-        // --- Draw Infinite Dot Grid ---
-        // We draw the grid *before* applying the user's zoom/pan to the context,
-        // so we can mathematically perfectly space the dots on the physical screen
-        // while making them *appear* to pan and zoom.
         const GRID_SIZE = 40 * zoom;
         const offsetX = panOffset.x % GRID_SIZE;
         const offsetY = panOffset.y % GRID_SIZE;
 
-        ctx.fillStyle = theme === 'dark' ? '#334155' : '#cbd5e1';
+        ctx.fillStyle = '#DCD6F7'; // theme-light
 
         for (let x = offsetX; x < canvas.width; x += GRID_SIZE) {
             for (let y = offsetY; y < canvas.height; y += GRID_SIZE) {
@@ -68,7 +127,6 @@ export default function Board() {
                 ctx.fill();
             }
         }
-        // ------------------------------
 
         ctx.translate(panOffset.x, panOffset.y);
         ctx.scale(zoom, zoom);
@@ -79,8 +137,7 @@ export default function Board() {
         ctx.lineJoin = 'round';
 
         const getThemeAwareColor = (color: string) => {
-            if (color === '#1e293b' && theme === 'dark') return '#f8fafc';
-            if (color === '#f8fafc' && theme === 'light') return '#1e293b';
+            if (color === '#424874') return '#424874';
             return color;
         };
 
@@ -89,7 +146,7 @@ export default function Board() {
 
             if (element.type === 'pencil' && element.points) {
                 const stroke = getStroke(element.points.map(p => [p.x, p.y]), {
-                    size: element.strokeWidth / zoom, // Keep pencil stroke consistent regardless of zoom
+                    size: element.strokeWidth / zoom,
                     thinning: 0.5,
                     smoothing: 0.5,
                     streamline: 0.5,
@@ -104,21 +161,14 @@ export default function Board() {
                 ctx.fillStyle = displayColor;
                 ctx.fillText(element.text || '', element.x1, element.y1);
             } else if (element.roughElement) {
-                // If it's roughjs, we must alter the stroke color dynamically without mutating the store
                 const originalOptions = element.roughElement.options;
                 const tempOptions = { ...originalOptions, stroke: displayColor };
 
-                // Nasty hack to draw rough element with different theme color, 
-                // since options are usually baked into the cached Drawable.
-                // Re-baking is expensive, so we just mutate the stroke on context just before draw?
-                // Actually RoughJs renders using its own internal operations array. 
-                // The easiest way is to modify the primitive ops:
                 element.roughElement.sets.forEach(() => {
                     rc.draw({ ...element.roughElement, options: tempOptions } as Drawable);
                 });
             }
 
-            // Draw selection bounding box
             if (selectedElement && element.id === selectedElement.id) {
                 let minX = element.x1, minY = element.y1, maxX = element.x2, maxY = element.y2;
 
@@ -135,7 +185,7 @@ export default function Board() {
                 }
 
                 const padding = 8 / zoom;
-                ctx.strokeStyle = '#3b82f6';
+                ctx.strokeStyle = '#A6B1E1'; // theme-accent
                 ctx.lineWidth = 2 / zoom;
                 ctx.setLineDash([5 / zoom, 5 / zoom]);
                 ctx.strokeRect(
@@ -144,13 +194,12 @@ export default function Board() {
                     Math.abs(maxX - minX) + padding * 2,
                     Math.abs(maxY - minY) + padding * 2
                 );
-                ctx.setLineDash([]); // Reset line dash
+                ctx.setLineDash([]);
 
-                // Draw resize handles for shapes and lines (not pencil/text)
                 if (element.type !== 'pencil' && element.type !== 'text') {
                     const handleSize = 8 / zoom;
-                    ctx.fillStyle = theme === 'dark' ? '#1e293b' : '#ffffff';
-                    ctx.strokeStyle = '#3b82f6';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = '#A6B1E1';
                     ctx.lineWidth = 1.5 / zoom;
 
                     const drawHandle = (hx: number, hy: number) => {
@@ -158,10 +207,10 @@ export default function Board() {
                         ctx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
                     };
 
-                    drawHandle(element.x1, element.y1); // NW
-                    drawHandle(element.x2, element.y1); // NE
-                    drawHandle(element.x1, element.y2); // SW
-                    drawHandle(element.x2, element.y2); // SE
+                    drawHandle(element.x1, element.y1);
+                    drawHandle(element.x2, element.y1);
+                    drawHandle(element.x1, element.y2);
+                    drawHandle(element.x2, element.y2);
                 }
             }
         });
@@ -176,6 +225,7 @@ export default function Board() {
                     useBoardStore.getState().redo();
                 } else {
                     useBoardStore.getState().undo();
+                    // Optional: emit full board state sync or reverse ops on undo
                 }
             } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
                 useBoardStore.getState().redo();
@@ -193,11 +243,10 @@ export default function Board() {
         const handleResize = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // Trigger a re-render to draw elements on new sized canvas
             setElements((prev) => [...prev]);
         };
 
-        handleResize(); // Initial setup
+        handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, [setElements]);
@@ -208,7 +257,6 @@ export default function Board() {
 
         if (activeTool === 'select' || activeTool === 'eraser') {
 
-            // Check for Resize Handle Hit FIRST
             if (activeTool === 'select' && selectedElement) {
                 const resizeHit = getResizeHandleHit(x, y, selectedElement, zoom);
                 if (resizeHit) {
@@ -225,8 +273,9 @@ export default function Board() {
                 if (hitElement) {
                     const newElements = elements.filter(el => el.id !== hitElement.id);
                     setElements(newElements);
+                    getSocket().emit('erase-element', { roomId, elementId: hitElement.id });
                 }
-                setIsDrawing(true); // Re-use isDrawing as "isErasing" to track drag state
+                setIsDrawing(true);
                 return;
             }
 
@@ -247,14 +296,20 @@ export default function Board() {
 
         setIsDrawing(true);
 
-        const id = elements.length.toString();
+        const id = elements.length > 0 ? (Math.max(...elements.map(e => parseInt(e.id) || 0)) + 1).toString() : '0';
         const element = createElement(id, x, y, x, y, activeTool, currentColor, currentStrokeWidth);
         setElements((prevState) => [...prevState, element]);
+        getSocket().emit('draw-element', { roomId, element });
     };
 
     const handlePointerMove = (e: React.PointerEvent) => {
         const { clientX, clientY } = e;
         const { x, y } = getMouseCoordinates(clientX, clientY);
+
+        // Emit cursor position for multiplayer
+        if (user) {
+            getSocket().emit('cursor-move', { roomId, user, x, y });
+        }
 
         if (activeTool === 'select' || activeTool === 'eraser') {
             if (activeTool === 'select' && selectedElement && !isDragging && !isResizing && !isDrawing) {
@@ -270,7 +325,8 @@ export default function Board() {
                 const hitElement = getElementAtPosition(x, y, elements);
                 if (hitElement) {
                     const newElements = elements.filter(el => el.id !== hitElement.id);
-                    setElements(newElements, true); // Overwrite history to prevent lag
+                    setElements(newElements, true);
+                    getSocket().emit('erase-element', { roomId, elementId: hitElement.id });
                 }
                 return;
             }
@@ -298,17 +354,17 @@ export default function Board() {
                 setElements(elementsCopy, true);
                 setSelectedElement(resizedElement);
                 setDragStartPoint({ x, y });
+                
+                getSocket().emit('draw-element', { roomId, element: resizedElement });
                 return;
             }
 
             if (e.buttons === 1 && !isDragging) {
-                // Pan with middle mouse button or select tool drag (missed element)
                 setPanOffset((prev) => ({
                     x: prev.x + e.movementX,
                     y: prev.y + e.movementY,
                 }));
             } else if (isDragging && selectedElement && dragStartPoint) {
-                // Moving an element
                 const dx = x - dragStartPoint.x;
                 const dy = y - dragStartPoint.y;
 
@@ -331,9 +387,11 @@ export default function Board() {
                 const elementsCopy = [...elements];
                 elementsCopy[index] = movedElement;
 
-                setElements(elementsCopy, true); // Overwrite history during drag
-                setSelectedElement(movedElement); // Keep selection updated
-                setDragStartPoint({ x, y }); // Reset drag start for next frame
+                setElements(elementsCopy, true);
+                setSelectedElement(movedElement);
+                setDragStartPoint({ x, y });
+                
+                getSocket().emit('draw-element', { roomId, element: movedElement });
             }
             return;
         }
@@ -341,7 +399,7 @@ export default function Board() {
         if (!isDrawing) return;
 
         const index = elements.length - 1;
-        const { x1, y1, type, points } = elements[index];
+        const { x1, y1, type, points, id } = elements[index];
 
         let updatedElement: Element;
 
@@ -351,18 +409,25 @@ export default function Board() {
                 points: [...(points || []), { x, y }]
             };
         } else {
-            updatedElement = createElement(index.toString(), x1, y1, x, y, type, elements[index].color, elements[index].strokeWidth, elements[index].text);
+            updatedElement = createElement(id, x1, y1, x, y, type, elements[index].color, elements[index].strokeWidth, elements[index].text);
         }
 
         const elementsCopy = [...elements];
         elementsCopy[index] = updatedElement;
         setElements(elementsCopy, true);
+        
+        // Emit during drawing to show live updates to others
+        getSocket().emit('draw-element', { roomId, element: updatedElement });
     };
 
     const handlePointerUp = () => {
         if (isDrawing || isDragging || isResizing) {
-            // This will trigger the final history save since we drop `overwriteHistory` next time setElements is called
             setElements([...elements]);
+            // Ensure final form of dragged/drawn element is synced
+            const latestElement = elements[elements.length - 1];
+            if (isDrawing && latestElement) {
+                getSocket().emit('draw-element', { roomId, element: latestElement });
+            }
         }
         setIsDrawing(false);
         setIsDragging(false);
@@ -372,20 +437,13 @@ export default function Board() {
     };
 
     const handleWheel = (e: React.WheelEvent) => {
-        // Prevent default browser scrolling/zooming behavior
-        // NOTE: This usually requires an active `passive: false` event listener at the document scale,
-        // but React's synthetic onWheel is somewhat limited for preventing default trackpad pinch zoom.
-        // For this simple engine, we'll implement basic scroll-to-pan & ctrl-scroll to zoom.
-
         if (e.ctrlKey || e.metaKey) {
-            // Zooming
             const zoomSensitivity = 0.001;
             setZoom((prevZoom) => {
                 const newZoom = prevZoom - e.deltaY * zoomSensitivity;
-                return Math.min(Math.max(newZoom, 0.1), 5); // Clamped between 0.1x and 5x
+                return Math.min(Math.max(newZoom, 0.1), 5);
             });
         } else {
-            // Panning
             setPanOffset((prev) => ({
                 x: prev.x - e.deltaX,
                 y: prev.y - e.deltaY,
@@ -397,7 +455,7 @@ export default function Board() {
         if (activeTool === 'text' && !writingPosition) {
             const { clientX, clientY } = e;
             const { x, y } = getMouseCoordinates(clientX, clientY);
-            const id = elements.length.toString();
+            const id = elements.length > 0 ? (Math.max(...elements.map(e => parseInt(e.id) || 0)) + 1).toString() : '0';
             const element = createElement(id, x, y, x, y, 'text', currentColor, currentStrokeWidth, '');
             setElements((prevState) => [...prevState, element]);
             setWritingPosition({ id, x, y });
@@ -422,7 +480,7 @@ export default function Board() {
         <div className="w-full h-full relative">
             <canvas
                 id="canvas"
-                className="w-full h-full bg-slate-50 dark:bg-[#121212] touch-none block"
+                className="w-full h-full bg-theme-lightest touch-none block"
                 style={{ cursor: getCursorStyle() }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -449,8 +507,11 @@ export default function Board() {
                         if (elIndex !== -1) {
                             if (text.trim() === '') {
                                 elementsCopy.splice(elIndex, 1);
+                                getSocket().emit('erase-element', { roomId, elementId: writingPosition.id });
                             } else {
-                                elementsCopy[elIndex] = { ...elementsCopy[elIndex], text };
+                                const updated = { ...elementsCopy[elIndex], text };
+                                elementsCopy[elIndex] = updated;
+                                getSocket().emit('draw-element', { roomId, element: updated });
                             }
                             setElements(elementsCopy);
                         }
@@ -459,6 +520,34 @@ export default function Board() {
                     }}
                 />
             )}
+
+            {/* Live Cursors Overlay */}
+            <AnimatePresence>
+                {Object.values(cursors).map(cursor => (
+                    <motion.div
+                        key={cursor.socketId}
+                        initial={{ opacity: 0 }}
+                        animate={{ 
+                            opacity: 1,
+                            x: cursor.x * zoom + panOffset.x,
+                            y: cursor.y * zoom + panOffset.y,
+                        }}
+                        exit={{ opacity: 0 }}
+                        transition={{ type: "tween", ease: "linear", duration: 0.1 }}
+                        className="absolute top-0 left-0 pointer-events-none z-40 flex flex-col items-start"
+                    >
+                        {/* Cursor Icon */}
+                        <svg width="24" height="36" viewBox="0 0 24 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-sm">
+                            <path d="M5.65376 2.15376C5.40539 1.55169 4.59461 1.55168 4.34624 2.15376L0.264426 12.046C0.0305603 12.613 0.449195 13.2384 1.05602 13.2384H3V17.5C3 18.3284 3.67157 19 4.5 19H5.5C6.32843 19 7 18.3284 7 17.5V13.2384H8.94398C9.55081 13.2384 9.96944 12.613 9.73557 12.046L5.65376 2.15376Z" fill="#A6B1E1" stroke="white" strokeWidth="1.5" />
+                        </svg>
+                        
+                        {/* User Name Tag */}
+                        <div className="bg-theme-accent text-white text-xs font-bold px-2 py-0.5 rounded-br-lg rounded-bl-lg rounded-tr-lg shadow-sm whitespace-nowrap -mt-2 ml-4">
+                            {cursor.user?.name || 'Guest'}
+                        </div>
+                    </motion.div>
+                ))}
+            </AnimatePresence>
         </div>
     );
 }

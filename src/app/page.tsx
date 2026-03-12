@@ -3,23 +3,48 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogIn, UserPlus, Users, PlusCircle, LogOut, User } from 'lucide-react';
+import { LogIn, UserPlus, Users, PlusCircle, LogOut, User, Sparkles } from 'lucide-react';
 import { useAuthStore } from './../store/useAuthStore';
+import { motion } from 'framer-motion';
 
 export default function Lobby() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
   const [roomId, setRoomId] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleCreateBoard = () => {
-    // Generate a simple random room ID for demo purposes
-    const newRoomId = Math.random().toString(36).substring(2, 9);
-    router.push(`/board/${newRoomId}`);
+  const handleCreateBoard = async () => {
+    setIsCreating(true);
+    try {
+        const payload = user ? {
+            isPrivate: false,
+            creatorEmail: user.email,
+            creatorName: user.name,
+            allowedEmails: []
+        } : { isPrivate: false };
+
+        const res = await fetch('/api/rooms/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            router.push(`/board/${data.roomId}`);
+        } else {
+            console.error('Failed to create room');
+            setIsCreating(false);
+        }
+    } catch (e) {
+        console.error(e);
+        setIsCreating(false);
+    }
   };
 
   const handleJoinBoard = (e: React.FormEvent) => {
@@ -30,21 +55,28 @@ export default function Lobby() {
   };
 
   return (
-    <main className="w-full h-screen overflow-hidden m-0 p-0 relative bg-slate-50 dark:bg-[#121212] flex flex-col items-center justify-center font-sans transition-colors duration-300">
-      {/* Decorative Background */}
-      <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/40 via-slate-50/20 to-transparent dark:from-blue-900/20 dark:via-[#121212]/20 dark:to-transparent pointer-events-none" />
+    <main className="w-full h-screen overflow-hidden m-0 p-0 relative bg-theme-lightest flex flex-col items-center justify-center font-sans tracking-tight">
+      {/* Soft Animated Background Blob */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 -left-12 w-96 h-96 bg-theme-light rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob" />
+        <div className="absolute bottom-1/4 -right-12 w-96 h-96 bg-theme-accent rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" style={{ animationDelay: "2s" }} />
+      </div>
 
       {/* Header / Auth */}
-      <div className="absolute top-0 right-0 p-6 z-20 flex gap-4">
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="absolute top-0 right-0 p-6 z-20 flex gap-4"
+      >
         {mounted && user ? (
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-medium bg-white/50 dark:bg-slate-800/50 px-4 py-2 rounded-xl backdrop-blur-sm shadow-sm">
-              <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <div className="flex items-center gap-2 text-theme-dark font-medium bg-white/60 px-4 py-2 rounded-xl backdrop-blur-md shadow-sm border border-white/50">
+              <User className="w-4 h-4 text-theme-accent" />
               <span>{user.name}</span>
             </div>
             <button
               onClick={logout}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors font-medium text-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-theme-dark hover:bg-theme-light transition-colors font-medium text-sm backdrop-blur-md"
             >
               <LogOut className="w-4 h-4" />
               Log Out
@@ -54,60 +86,68 @@ export default function Lobby() {
           <>
             <Link
               href="/login"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors font-medium text-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-theme-dark hover:bg-theme-light transition-colors font-medium text-sm backdrop-blur-md"
             >
               <LogIn className="w-4 h-4" />
               Log In
             </Link>
             <Link
               href="/register"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg font-medium text-sm"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-theme-dark hover:bg-theme-dark/90 text-white transition-colors shadow-sm font-medium text-sm"
             >
               <UserPlus className="w-4 h-4" />
               Sign Up
             </Link>
           </>
         )}
-      </div>
+      </motion.div>
 
-      <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-6">
+      <div className="relative z-10 flex flex-col items-center max-w-md w-full px-6">
 
         {/* Logo / Branding */}
-        <div className="text-center mb-12">
-          <h1 className="text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 tracking-tight mb-4">
-            OmniBoard
-          </h1>
-          <p className="text-lg text-slate-500 dark:text-slate-400 font-medium tracking-wide">
-            A collaborative infinite canvas.
-          </p>
-          <div className="mt-4 inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-            <p className="text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
-              Made by <span className="text-blue-600 dark:text-blue-400">Atharv</span> and <span className="text-indigo-600 dark:text-indigo-400">Saran</span>
-            </p>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-10"
+        >
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <Sparkles className="w-8 h-8 text-theme-accent animate-[pulse_3s_ease-in-out_infinite]" />
+            <h1 className="text-5xl font-black text-theme-dark tracking-tight">
+              OmniBoard
+            </h1>
           </div>
-        </div>
+          <p className="text-base text-theme-dark/70 font-medium">
+            Your open, real-time infinite canvas.
+          </p>
+        </motion.div>
 
         {/* Main Action Cards */}
-        <div className="w-full bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl border border-white/50 dark:border-slate-700/50 p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex flex-col gap-6">
-
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="w-full bg-white/70 backdrop-blur-xl border border-white p-8 rounded-[2rem] shadow-xl shadow-theme-dark/5 flex flex-col gap-6 relative overflow-hidden"
+        >
           {/* Create Room */}
           <button
             onClick={handleCreateBoard}
-            className="w-full group flex items-center justify-center gap-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white p-4 rounded-2xl shadow-lg hover:shadow-xl transition-all font-semibold text-lg"
+            disabled={isCreating}
+            className="w-full group flex items-center justify-center gap-3 bg-theme-dark hover:bg-theme-dark/90 text-white p-4 rounded-2xl shadow-md transition-all duration-300 font-semibold text-lg disabled:opacity-50"
           >
             <PlusCircle className="w-6 h-6 group-hover:scale-110 transition-transform" />
-            Create New Workspace
+            <span>{isCreating ? 'Launching...' : 'Create Workspace'}</span>
           </button>
 
-          <div className="flex items-center gap-4 my-2">
-            <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1" />
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">OR</span>
-            <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1" />
+          <div className="flex items-center gap-4 my-1">
+            <div className="h-[2px] bg-theme-light flex-1 rounded-full" />
+            <span className="text-xs font-bold text-theme-accent uppercase tracking-widest">OR</span>
+            <div className="h-[2px] bg-theme-light flex-1 rounded-full" />
           </div>
 
           {/* Join Room */}
           <form onSubmit={handleJoinBoard} className="flex flex-col gap-3">
-            <label htmlFor="roomId" className="text-sm font-semibold text-slate-600 dark:text-slate-300">
+            <label htmlFor="roomId" className="text-sm font-bold text-theme-dark ml-1">
               Join existing workspace
             </label>
             <div className="flex gap-2">
@@ -117,12 +157,12 @@ export default function Lobby() {
                 placeholder="Enter Room ID..."
                 value={roomId}
                 onChange={(e) => setRoomId(e.target.value)}
-                className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono"
+                className="flex-1 bg-white border-2 border-theme-light rounded-xl px-4 py-3 text-theme-dark focus:outline-none focus:border-theme-accent transition-colors font-mono placeholder:text-theme-dark/30"
               />
               <button
                 type="submit"
                 disabled={!roomId.trim()}
-                className="bg-slate-800 hover:bg-slate-900 dark:bg-slate-200 dark:hover:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="bg-theme-light hover:bg-theme-accent text-theme-dark border-2 border-theme-light hover:border-theme-accent px-6 py-3 rounded-xl font-bold transition-all duration-300 disabled:opacity-50 flex items-center gap-2"
               >
                 <Users className="w-5 h-5" />
                 Join
@@ -130,9 +170,9 @@ export default function Lobby() {
             </div>
           </form>
 
-        </div>
-
+        </motion.div>
       </div>
+
     </main>
   );
 }
