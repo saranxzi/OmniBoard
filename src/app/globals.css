@@ -4,10 +4,118 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-primary: #F4EEFF;
+  --bg-surface: rgba(255, 255, 255, 0.8);
+  --bg-canvas: #F4EEFF;
+  --text-primary: #424874;
+  --text-secondary: rgba(66, 72, 116, 0.7);
+  --border-color: #DCD6F7;
+  --accent: #A6B1E1;
+  --grid-dot: #DCD6F7;
+}
+
+.dark {
+  --bg-primary: #0f0f1a;
+  --bg-surface: rgba(22, 22, 38, 0.85);
+  --bg-canvas: #0f0f1a;
+  --text-primary: #e2e8f0;
+  --text-secondary: rgba(226, 232, 240, 0.7);
+  --border-color: #2a2b3e;
+  --accent: #818cf8;
+  --grid-dot: #1e1f32;
+}
+
 body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  color: #424874;
-  background: #F4EEFF;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode canvas background */
+.dark .bg-theme-lightest {
+  background-color: #0f0f1a !important;
+}
+
+/* Dark mode toolbar glassmorphism */
+.dark .bg-white\/80 {
+  background-color: rgba(22, 22, 38, 0.85) !important;
+  border-color: #2a2b3e !important;
+}
+
+.dark .bg-white\/70 {
+  background-color: rgba(22, 22, 38, 0.8) !important;
+}
+
+.dark .bg-white\/95 {
+  background-color: rgba(15, 15, 26, 0.95) !important;
+}
+
+.dark .bg-white {
+  background-color: #161626 !important;
+}
+
+.dark .hover\:bg-white:hover {
+  background-color: #1a1a2e !important;
+}
+
+.dark .text-theme-dark {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-theme-dark\/50 {
+  color: rgba(226, 232, 240, 0.5) !important;
+}
+
+.dark .text-theme-dark\/60 {
+  color: rgba(226, 232, 240, 0.6) !important;
+}
+
+.dark .text-theme-dark\/70 {
+  color: rgba(226, 232, 240, 0.7) !important;
+}
+
+.dark .text-theme-dark\/40 {
+  color: rgba(226, 232, 240, 0.4) !important;
+}
+
+.dark .border-theme-light {
+  border-color: #2a2b3e !important;
+}
+
+.dark .bg-theme-lightest {
+  background-color: #161626 !important;
+}
+
+.dark .bg-theme-light {
+  background-color: #1e1f32 !important;
+}
+
+.dark .hover\:bg-theme-lightest:hover {
+  background-color: #1e1f32 !important;
+}
+
+.dark .hover\:bg-theme-light:hover {
+  background-color: #2a2b3e !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2a2b3e;
 }

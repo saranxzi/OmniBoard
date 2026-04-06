@@ -1,38 +1,41 @@
 'use client';
 
 import { useBoardStore } from '@/store/useBoardStore';
-import { useParams } from 'next/navigation';
-import { useSocketSync } from '@/hooks/useSocketSync';
 import { useCanvasRenderer } from '@/hooks/useCanvasRenderer';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useDrawingHandlers } from '@/hooks/useDrawingHandlers';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import { CursorData, ElementLock } from '@/types';
 
 /**
  * Board — the main collaborative canvas component.
  * Composes hooks for socket sync, rendering, keyboard shortcuts, and drawing handlers.
  * This component only handles layout and JSX — all logic lives in hooks.
  */
-export default function Board() {
-    const params = useParams();
-    const roomId = params.roomId as string;
+interface BoardProps {
+    roomCode: string;
+    cursors: Record<string, CursorData>;
+    emitCursor: (x: number, y: number) => void;
+    lockedElements?: Record<string, ElementLock>;
+}
+
+export default function Board({ roomCode, cursors, emitCursor, lockedElements = {} }: BoardProps) {
     const { panOffset, zoom, currentColor } = useBoardStore();
 
-    // Socket sync — room join, element CRUD, cursor & user tracking
-    const { cursors, emitCursor } = useSocketSync(roomId);
-
-    // Canvas rendering — grid, elements, selection, handles
-    useCanvasRenderer();
+    // Canvas rendering — grid, elements, selection, handles, lock indicators
+    useCanvasRenderer({ lockedElements });
 
     // Keyboard shortcuts — undo/redo, delete, tool switching
-    useKeyboardShortcuts(roomId);
+    useKeyboardShortcuts(roomCode);
 
-    // Drawing handlers — pointer events, text input, cursor style
+    // Drawing handlers — pointer events, text input, cursor style, image drop, connectors
     const {
         handlePointerDown, handlePointerMove, handlePointerUp,
-        handleWheel, handleClick, handleTextBlur,
+        handleWheel, handleClick, handleDoubleClick, handleTextBlur,
+        handleDragOver, handleDrop,
         getCursorStyle, writingPosition,
-    } = useDrawingHandlers(roomId, emitCursor);
+    } = useDrawingHandlers(roomCode, emitCursor, { lockedElements });
 
     return (
         <div className="w-full h-full relative">
@@ -45,10 +48,13 @@ export default function Board() {
                 onPointerUp={handlePointerUp}
                 onPointerLeave={handlePointerUp}
                 onClick={handleClick}
+                onDoubleClick={handleDoubleClick}
                 onWheel={handleWheel}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
             />
 
-            {/* Text input overlay */}
+            {/* Text input overlay (for text tool and sticky note editing) */}
             {writingPosition && (
                 <textarea
                     autoFocus

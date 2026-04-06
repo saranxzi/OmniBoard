@@ -4,10 +4,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Toolbar from '@/components/Toolbar';
+import ChatPanel from '@/components/ChatPanel';
 import { useAuthStore } from '@/store/useAuthStore';
 import WorkspaceSettings from '@/components/WorkspaceSettings';
+import EmptyCanvas from '@/components/EmptyCanvas';
+import Minimap from '@/components/Minimap';
 import { Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useSocketSync } from '@/hooks/useSocketSync';
 
 const Board = dynamic(() => import('@/components/Board'), {
     ssr: false,
@@ -18,7 +22,6 @@ const Board = dynamic(() => import('@/components/Board'), {
         </div>
     )
 });
-
 export default function BoardPage({ params }: { params: { roomId: string } }) {
     const { user } = useAuthStore();
     const router = useRouter();
@@ -26,6 +29,10 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
     const [resolvedRoomId, setResolvedRoomId] = useState<string | null>(null);
     const [roomCode, setRoomCode] = useState<string | null>(null);
     const [isPrivate, setIsPrivate] = useState(false);
+    const [isCreator, setIsCreator] = useState(false);
+
+    // Lifted socket sync state to page level
+    const { cursors, roomUsers, emitCursor, lockedElements } = useSocketSync(roomCode || '', !!roomCode);
 
     useEffect(() => {
         const verifyAccess = async () => {
@@ -41,6 +48,7 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                     setResolvedRoomId(data.roomId);
                     setRoomCode(data.code);
                     setIsPrivate(data.isPrivate || false);
+                    setIsCreator(data.role === 'creator');
                     setIsAuthorized(true);
                 } else {
                     setIsAuthorized(false);
@@ -98,12 +106,32 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                 </div>
             )}
 
-            {/* Workspace Settings - rendered at top level outside canvas stacking context */}
-            {roomCode && <WorkspaceSettings roomCode={roomCode} isPrivate={isPrivate} />}
+            {/* UI Overlays outside canvas stacking context */}
+            {roomCode && (
+                <>
+                    <WorkspaceSettings 
+                        roomCode={roomCode} 
+                        isPrivate={isPrivate} 
+                        isCreator={isCreator} 
+                        roomUsers={roomUsers}
+                    />
+                    <ChatPanel roomId={roomCode} />
+                </>
+            )}
 
             <div className="relative z-10 w-full h-full">
-                {resolvedRoomId && <Board key={resolvedRoomId} />}
+                {roomCode && (
+                    <Board 
+                        key={resolvedRoomId} 
+                        roomCode={roomCode} 
+                        cursors={cursors}
+                        emitCursor={emitCursor}
+                        lockedElements={lockedElements}
+                    />
+                )}
                 <Toolbar />
+                <EmptyCanvas />
+                <Minimap />
             </div>
         </main>
     );

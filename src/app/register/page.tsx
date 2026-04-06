@@ -50,10 +50,13 @@ export default function RegisterPage() {
             });
 
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Registration failed');
+            if (!res.ok) {
+                const errMsg = data.error?.message || data.error || 'Registration failed';
+                throw new Error(errMsg);
+            }
             router.push('/login');
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
         } finally {
             setLoading(false);
         }

@@ -67,13 +67,23 @@ export async function POST(req: Request) {
                 })
             );
 
-            await prisma.roomAccess.createMany({
-                data: users.map((user: { id: string }) => ({
-                    roomId: room.id,
-                    userId: user.id,
-                })),
-                skipDuplicates: true,
-            });
+            await Promise.all(
+                users.map((user: { id: string }) =>
+                    prisma.roomAccess.upsert({
+                        where: {
+                            roomId_userId: {
+                                roomId: room.id,
+                                userId: user.id,
+                            }
+                        },
+                        create: {
+                            roomId: room.id,
+                            userId: user.id,
+                        },
+                        update: {},
+                    })
+                )
+            );
         }
 
         return NextResponse.json({ roomId: room.id, code: room.code }, { status: 201 });

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useBoardStore, Tool } from '@/store/useBoardStore';
+import { useBoardStore } from '@/store/useBoardStore';
+import { Tool } from '@/types';
 import { getSocket } from '@/lib/socket';
 
 /** Maps single-key shortcuts to tool types */
@@ -8,9 +9,13 @@ const TOOL_SHORTCUTS: Record<string, Tool> = {
     p: 'pencil',
     l: 'line',
     a: 'arrow',
+    c: 'connector',
     r: 'rectangle',
     o: 'ellipse',
     d: 'diamond',
+    s: 'star',
+    n: 'sticky',
+    i: 'image',
     t: 'text',
     e: 'eraser',
 };

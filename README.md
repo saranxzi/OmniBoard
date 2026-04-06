@@ -6,15 +6,16 @@ A **real-time collaborative whiteboard** built for seamless team collaboration �
 
 ## ✨ Features
 
-- **9 Drawing Tools** — Select, Pencil (freehand), Line, Arrow, Rectangle, Ellipse, Diamond, Text, Eraser
+- **11 Drawing Tools** — Select, Pencil (freehand), Line, Arrow, Rectangle, Ellipse, Diamond, **Star**, **Sticky Note**, Text, Eraser
 - **Real-Time Collaboration** — Live cursor tracking, instant element sync via WebSocket
-- **Unified Toolbar** — All tools, colors, stroke widths, undo/redo, zoom, export in one clean bar
-- **Workspace Settings** — Room codes, privacy controls, active user list
-- **Responsive Canvas** — Infinite pan & zoom with pinch/scroll support
-- **Sketchy Aesthetic** — Rough.js hand-drawn style rendering
-- **Auth System** — Secure registration & login with bcrypt, rate limiting, and timing-attack prevention
-- **Export** — Download your board as a PNG image
-- **Keyboard Shortcuts** — V, P, L, A, R, O, D, T, E for tools; Ctrl+Z/Y for undo/redo; Delete to remove
+- **Live Text Chat** — Premium sliding chat panel with unread message badges and real-time broadcasting
+- **Unified Toolbar** — All tools, colors, stroke widths, undo/redo, zoom, export, and clear action in one clean "glassmorphism" bar
+- **Workspace Settings** — Room codes, privacy controls (Public/Private), and real-time creator-led user kicking
+- **Infinite Canvas** — Smooth pan & zoom with pinch/scroll support and a subtle dotted grid
+- **Sketchy Aesthetic** — Rough.js hand-drawn style rendering for that "whiteboard" feel
+- **Secure Auth** — Multi-layered registration & login with bcrypt, per-IP rate limiting, and backend hardening
+- **Export** — Download your creative masterpieces as high-quality PNGs
+- **Keyboard Shortcuts** — V, P, L, A, R, O, D, S, N, T, E for tools; Ctrl+Z/Y for undo/redo; Delete to remove element
 
 ## 🏗 Architecture
 
@@ -53,14 +54,13 @@ A **real-time collaborative whiteboard** built for seamless team collaboration �
 |---|---|
 | Framework | Next.js 14 (App Router) |
 | Language | TypeScript |
-| Styling | Tailwind CSS |
+| Styling | Tailwind CSS + Framer Motion |
 | State | Zustand |
 | Canvas | HTML5 Canvas + Rough.js |
-| Freehand | perfect-freehand |
-| Animations | Framer Motion |
 | Real-time | Socket.IO |
-| Database | SQLite via Prisma |
-| Auth | bcryptjs |
+| Database | Neon PostgreSQL (Cloud) |
+| ORM | Prisma |
+| Auth | bcryptjs + timing-safe-equal |
 | Icons | Lucide React |
 
 ## 🚀 Getting Started
@@ -72,30 +72,35 @@ A **real-time collaborative whiteboard** built for seamless team collaboration �
 
 ### Installation
 
+1. **Clone and Install Backend/Frontend Dependencies:**
+   ```bash
+   pnpm install
+   ```
+
+2. **Database Sync (Neon Postgres):**
+   Make sure your `.env` is configured (I have already done this for you!).
+   ```bash
+   npx prisma db push
+   ```
+
+### 🏃‍♂️ Running the Project
+
+You need to run **two separate terminals** for the full experience:
+
+#### Terminal 1: Next.js Frontend
 ```bash
-git clone https://github.com/saranxzi/OmniBoard.git
-cd OmniBoard/v1
-pnpm install
-cd server && pnpm install && cd ..
-```
-
-### Database Setup
-
-```bash
-npx prisma db push
-```
-
-### Run Development
-
-```bash
-# Terminal 1 — Next.js frontend
 pnpm dev
+```
 
-# Terminal 2 — WebSocket server
+#### Terminal 2: WebSocket Server (Backend)
+```bash
 node server/index.js
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to start collaborating.
+Once both are running:
+1. Open [http://localhost:3000](http://localhost:3000).
+2. Register an account and Create/Join a room!
+3. Invite a friend (or open another tab) to see real-time sync in action!
 
 ## 📡 API Endpoints
 

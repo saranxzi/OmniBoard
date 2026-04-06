@@ -1,30 +1,37 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useBoardStore, Element } from '@/store/useBoardStore';
+import { useBoardStore } from '@/store/useBoardStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { getSocket } from '@/lib/socket';
-
-interface CursorData {
-    socketId: string;
-    x: number;
-    y: number;
-    user: { name?: string } | null;
-}
+import { Element, CursorData, ElementLock } from '@/types';
 
 /**
  * Manages WebSocket connection for room sync — element CRUD, cursor sharing,
- * and active user tracking. Returns cursors state and room users.
+ * active user tracking, and element-level locking.
+ * Returns cursors state, room users, lock state, and emitCursor.
  */
-export function useSocketSync(roomId: string) {
+export function useSocketSync(roomId: string, enabled: boolean = true) {
     const { setElements, setSelectedElement } = useBoardStore();
     const { user } = useAuthStore();
     const [cursors, setCursors] = useState<Record<string, CursorData>>({});
     const [roomUsers, setRoomUsers] = useState<{ count: number; users: { socketId: string; name: string }[] }>({ count: 0, users: [] });
+    const [lockedElements, setLockedElements] = useState<Record<string, ElementLock>>({});
 
     useEffect(() => {
-        const socket = getSocket();
-        socket.connect();
+        if (!enabled || !roomId) return;
 
-        socket.emit('join-room', { roomId, userName: user?.name || 'Guest' });
+        const socket = getSocket();
+
+        const joinRoom = () => {
+            socket.emit('join-room', { roomId, userName: user?.name || 'Guest' });
+        };
+
+        socket.on('connect', joinRoom);
+        
+        if (socket.connected) {
+            joinRoom();
+        } else {
+            socket.connect();
+        }
 
         socket.on('init-room', (serverElements: Element[]) => {
             setElements(serverElements);
@@ -52,6 +59,7 @@ export function useSocketSync(roomId: string) {
         socket.on('canvas-cleared', () => {
             setElements([], true);
             setSelectedElement(null);
+            setLockedElements({});
         });
 
         socket.on('cursor-update', (data: CursorData) => {
@@ -70,8 +78,31 @@ export function useSocketSync(roomId: string) {
             setRoomUsers(data);
         });
 
+        // ── Element Locking (Phase 2) ──
+
+        socket.on('element-locked', (lock: ElementLock) => {
+            setLockedElements(prev => ({
+                ...prev,
+                [lock.elementId]: lock,
+            }));
+        });
+
+        socket.on('element-unlocked', (elementId: string) => {
+            setLockedElements(prev => {
+                const next = { ...prev };
+                delete next[elementId];
+                return next;
+            });
+        });
+
+        socket.on('lock-rejected', ({ elementId, userName }: { elementId: string; userName: string }) => {
+            // Show a non-intrusive notification
+            console.log(`[Lock] Element ${elementId} is locked by ${userName}`);
+        });
+
         return () => {
             socket.disconnect();
+            socket.off('connect', joinRoom);
             socket.off('init-room');
             socket.off('update-element');
             socket.off('remove-element');
@@ -79,16 +110,22 @@ export function useSocketSync(roomId: string) {
             socket.off('cursor-update');
             socket.off('cursor-remove');
             socket.off('room-users');
+            socket.off('element-locked');
+            socket.off('element-unlocked');
+            socket.off('lock-rejected');
         };
-    }, [roomId, setElements, setSelectedElement, user]);
+    }, [roomId, enabled, setElements, setSelectedElement, user]);
 
     /** Emit cursor position to other clients */
     const emitCursor = useCallback((x: number, y: number) => {
-        const { user } = useAuthStore.getState();
-        if (user) {
-            getSocket().emit('cursor-move', { roomId, user, x, y });
-        }
+        const { user: authUser } = useAuthStore.getState();
+        getSocket().emit('cursor-move', { 
+            roomId, 
+            user: authUser || { name: 'Guest' }, 
+            x, 
+            y 
+        });
     }, [roomId]);
 
-    return { cursors, roomUsers, emitCursor };
+    return { cursors, roomUsers, emitCursor, lockedElements };
 }
