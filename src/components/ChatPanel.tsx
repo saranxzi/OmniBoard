@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { MessageSquare, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { MessageSquare, X, Sparkles } from 'lucide-react';
 import { getSocket } from '@/lib/socket';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatMessage } from '@/types';
@@ -15,23 +15,94 @@ interface ChatPanelProps {
 }
 
 /**
- * ChatPanel — Handles real-time messaging and UI state.
- * Modularized for better readability.
+ * ChatPanel — Handles real-time messaging, AI chatbot streaming, and UI state.
  */
 export default function ChatPanel({ roomId }: ChatPanelProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputText, setInputText] = useState('');
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isAiThinking, setIsAiThinking] = useState(false);
+
+    // Track streaming AI messages by their ID
+    const streamingMessagesRef = useRef<Map<string, string>>(new Map());
 
     useEffect(() => {
         const socket = getSocket();
+
         const handleChatMessage = (msg: ChatMessage) => {
             setMessages((prev) => [...prev, msg]);
             if (!isOpen) setUnreadCount((prev) => prev + 1);
         };
+
+        // AI streaming events
+        const handleAiStart = ({ id }: { id: string }) => {
+            setIsAiThinking(true);
+            streamingMessagesRef.current.set(id, '');
+
+            // Add a placeholder bot message
+            const botMsg: ChatMessage = {
+                id,
+                socketId: 'ai-bot',
+                user: 'OmniBoard AI',
+                text: '',
+                timestamp: Date.now(),
+                isBot: true,
+                isStreaming: true,
+            };
+            setMessages((prev) => [...prev, botMsg]);
+            if (!isOpen) setUnreadCount((prev) => prev + 1);
+        };
+
+        const handleAiChunk = ({ id, token }: { id: string; token: string }) => {
+            const current = streamingMessagesRef.current.get(id) || '';
+            const updated = current + token;
+            streamingMessagesRef.current.set(id, updated);
+
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.id === id ? { ...msg, text: updated } : msg
+                )
+            );
+        };
+
+        const handleAiEnd = ({ id }: { id: string }) => {
+            setIsAiThinking(false);
+            streamingMessagesRef.current.delete(id);
+
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.id === id ? { ...msg, isStreaming: false } : msg
+                )
+            );
+        };
+
+        const handleAiError = ({ id, error }: { id: string; error: string }) => {
+            setIsAiThinking(false);
+            streamingMessagesRef.current.delete(id);
+
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.id === id
+                        ? { ...msg, text: `⚠️ ${error}`, isStreaming: false }
+                        : msg
+                )
+            );
+        };
+
         socket.on('chat-message', handleChatMessage);
-        return () => { socket.off('chat-message', handleChatMessage); };
+        socket.on('ai-response-start', handleAiStart);
+        socket.on('ai-response-chunk', handleAiChunk);
+        socket.on('ai-response-end', handleAiEnd);
+        socket.on('ai-response-error', handleAiError);
+
+        return () => {
+            socket.off('chat-message', handleChatMessage);
+            socket.off('ai-response-start', handleAiStart);
+            socket.off('ai-response-chunk', handleAiChunk);
+            socket.off('ai-response-end', handleAiEnd);
+            socket.off('ai-response-error', handleAiError);
+        };
     }, [isOpen]);
 
     const handleSendMessage = (e?: React.FormEvent) => {
@@ -64,6 +135,11 @@ export default function ChatPanel({ roomId }: ChatPanelProps) {
                             {unreadCount > 99 ? '99+' : unreadCount}
                         </div>
                     )}
+                    {isAiThinking && (
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3">
+                            <Sparkles className="w-3 h-3 text-purple-500 animate-ai-pulse" />
+                        </div>
+                    )}
                 </div>
             </motion.button>
 
@@ -88,6 +164,12 @@ export default function ChatPanel({ roomId }: ChatPanelProps) {
                                 <h2 className="text-lg font-black text-theme-dark flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5 text-theme-accent" />
                                     Chat
+                                    {isAiThinking && (
+                                        <span className="flex items-center gap-1 text-xs font-medium text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200 animate-pulse">
+                                            <Sparkles className="w-3 h-3" />
+                                            AI thinking...
+                                        </span>
+                                    )}
                                 </h2>
                                 <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg hover:bg-theme-lightest text-theme-dark/40 hover:text-theme-dark transition-colors">
                                     <X className="w-5 h-5" />
@@ -100,6 +182,7 @@ export default function ChatPanel({ roomId }: ChatPanelProps) {
                                 value={inputText}
                                 onChange={setInputText}
                                 onSubmit={handleSendMessage}
+                                isAiThinking={isAiThinking}
                             />
                         </motion.div>
                     </>

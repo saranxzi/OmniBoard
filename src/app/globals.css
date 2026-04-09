@@ -102,6 +102,83 @@ body {
   background-color: #2a2b3e !important;
 }
 
+/* ── AI Chat Bot Styling ── */
+
+/* Bot message bubble — gradient background */
+.ai-message-bubble {
+  background: linear-gradient(135deg, #f3e8ff 0%, #ede9fe 30%, #e8e0ff 100%);
+  color: #4c1d95;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  position: relative;
+}
+
+.dark .ai-message-bubble {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.25) 0%, rgba(67, 56, 202, 0.2) 50%, rgba(49, 46, 129, 0.25) 100%);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+/* Streaming state — pulsing glow */
+.ai-message-bubble.ai-streaming {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.15), 0 0 30px rgba(139, 92, 246, 0.05);
+  animation: ai-bubble-glow 2s ease-in-out infinite;
+}
+
+.dark .ai-message-bubble.ai-streaming {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2), 0 0 30px rgba(139, 92, 246, 0.1);
+}
+
+/* AI pulse animation for icons */
+@keyframes ai-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}
+
+.animate-ai-pulse {
+  animation: ai-pulse 1.5s ease-in-out infinite;
+}
+
+/* Bubble glow during streaming */
+@keyframes ai-bubble-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.1), 0 0 20px rgba(139, 92, 246, 0.05); }
+  50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.2), 0 0 40px rgba(139, 92, 246, 0.1); }
+}
+
+/* Typing cursor blink */
+.ai-typing-cursor {
+  display: inline;
+  color: #7c3aed;
+  animation: typing-cursor-blink 0.8s steps(1) infinite;
+  font-weight: 400;
+}
+
+.dark .ai-typing-cursor {
+  color: #a78bfa;
+}
+
+@keyframes typing-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* AI message text styling */
+.ai-message-text {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.ai-message-text code {
+  background: rgba(139, 92, 246, 0.1);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.dark .ai-message-text code {
+  background: rgba(139, 92, 246, 0.2);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Settings, X, Copy, Check } from 'lucide-react';
 import { getSocket } from '@/lib/socket';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RoomUsers } from '@/types';
+import { RoomUsers, RoomRole } from '@/types';
 
 // Sub-components
 import UserList from './WorkspaceSettings/UserList';
@@ -14,21 +14,22 @@ import InviteLink from './WorkspaceSettings/InviteLink';
 interface WorkspaceSettingsProps {
     roomCode: string;
     isPrivate: boolean;
-    isCreator: boolean;
+    myRole: RoomRole;
     roomUsers: RoomUsers;
 }
 
 /**
  * WorkspaceSettings — A modular panel for room management.
- * Handles visibility, user listing, and invite sharing.
+ * Handles visibility, user listing, invite sharing, and role management.
  */
-export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivate, isCreator, roomUsers }: WorkspaceSettingsProps) {
+export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivate, myRole, roomUsers }: WorkspaceSettingsProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
     const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
 
     const { users: activeUsers, count: userCount } = roomUsers;
+    const isLeader = myRole === 'leader';
 
     useEffect(() => {
         const socket = getSocket();
@@ -56,7 +57,7 @@ export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivat
     };
 
     const handleTogglePrivacy = async () => {
-        if (!isCreator) return;
+        if (!isLeader) return;
         setIsUpdatingPrivacy(true);
         try {
             const res = await fetch('/api/rooms/update', {
@@ -73,9 +74,27 @@ export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivat
     };
 
     const handleKickUser = (socketId: string) => {
-        if (!isCreator) return;
+        if (!isLeader) return;
         getSocket().emit('kick-user', { roomCode, targetSocketId: socketId });
     };
+
+    const handleUpdateRole = (socketId: string, newRole: RoomRole) => {
+        if (!isLeader) return;
+        getSocket().emit('update-user-role', { roomId: roomCode, targetSocketId: socketId, newRole });
+    };
+
+    const handleTransferLeadership = (socketId: string) => {
+        if (!isLeader) return;
+        if (!window.confirm('Are you sure you want to transfer leadership? You will become an editor.')) return;
+        getSocket().emit('transfer-leadership', { roomId: roomCode, targetSocketId: socketId });
+    };
+
+    // Role badge for the header
+    const roleBadge = {
+        leader: { text: 'Leader', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+        editor: { text: 'Editor', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+        viewer: { text: 'Viewer', color: 'bg-gray-100 text-gray-600 border-gray-200' },
+    }[myRole];
 
     return (
         <>
@@ -110,7 +129,12 @@ export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivat
                             className="fixed left-0 top-0 bottom-0 z-[70] w-80 bg-white/95 backdrop-blur-2xl border-r border-theme-light shadow-2xl flex flex-col"
                         >
                             <div className="p-6 border-b border-theme-light flex items-center justify-between">
-                                <h2 className="text-lg font-black text-theme-dark">Workspace</h2>
+                                <div className="flex items-center gap-3">
+                                    <h2 className="text-lg font-black text-theme-dark">Workspace</h2>
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${roleBadge.color}`}>
+                                        {roleBadge.text}
+                                    </span>
+                                </div>
                                 <button onClick={() => setIsOpen(false)} className="p-1.5 rounded-lg hover:bg-theme-lightest text-theme-dark/40 hover:text-theme-dark transition-colors">
                                     <X className="w-5 h-5" />
                                 </button>
@@ -123,7 +147,7 @@ export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivat
                                         <span className="font-mono font-black text-xl text-theme-dark tracking-[0.3em]">{roomCode}</span>
                                         <PrivacySettings
                                             isPrivate={isPrivate}
-                                            isCreator={isCreator}
+                                            isCreator={isLeader}
                                             isUpdatingPrivacy={isUpdatingPrivacy}
                                             onToggle={handleTogglePrivacy}
                                         />
@@ -135,8 +159,10 @@ export default function WorkspaceSettings({ roomCode, isPrivate: initialIsPrivat
                                 <UserList
                                     users={activeUsers}
                                     count={userCount}
-                                    isCreator={isCreator}
+                                    isLeader={isLeader}
                                     onKick={handleKickUser}
+                                    onUpdateRole={handleUpdateRole}
+                                    onTransferLeadership={handleTransferLeadership}
                                 />
                             </div>
 

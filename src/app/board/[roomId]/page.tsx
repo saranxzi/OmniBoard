@@ -9,9 +9,10 @@ import { useAuthStore } from '@/store/useAuthStore';
 import WorkspaceSettings from '@/components/WorkspaceSettings';
 import EmptyCanvas from '@/components/EmptyCanvas';
 import Minimap from '@/components/Minimap';
-import { Lock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Lock, ShieldAlert, Eye } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSocketSync } from '@/hooks/useSocketSync';
+import { RoomRole } from '@/types';
 
 const Board = dynamic(() => import('@/components/Board'), {
     ssr: false,
@@ -22,6 +23,7 @@ const Board = dynamic(() => import('@/components/Board'), {
         </div>
     )
 });
+
 export default function BoardPage({ params }: { params: { roomId: string } }) {
     const { user } = useAuthStore();
     const router = useRouter();
@@ -29,10 +31,10 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
     const [resolvedRoomId, setResolvedRoomId] = useState<string | null>(null);
     const [roomCode, setRoomCode] = useState<string | null>(null);
     const [isPrivate, setIsPrivate] = useState(false);
-    const [isCreator, setIsCreator] = useState(false);
+    const [initialRole, setInitialRole] = useState<RoomRole>('editor');
 
     // Lifted socket sync state to page level
-    const { cursors, roomUsers, emitCursor, lockedElements } = useSocketSync(roomCode || '', !!roomCode);
+    const { cursors, roomUsers, emitCursor, lockedElements, myRole, permissionDenied } = useSocketSync(roomCode || '', !!roomCode, initialRole);
 
     useEffect(() => {
         const verifyAccess = async () => {
@@ -48,7 +50,7 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                     setResolvedRoomId(data.roomId);
                     setRoomCode(data.code);
                     setIsPrivate(data.isPrivate || false);
-                    setIsCreator(data.role === 'creator');
+                    setInitialRole(data.role || 'editor');
                     setIsAuthorized(true);
                 } else {
                     setIsAuthorized(false);
@@ -103,8 +105,29 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                 <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 bg-white/80 backdrop-blur-2xl rounded-xl shadow-sm border border-theme-light px-4 py-1.5 flex items-center gap-2">
                     <span className="text-xs text-theme-dark/50 font-medium">Room</span>
                     <span className="text-sm font-mono font-black text-theme-dark tracking-widest">{roomCode}</span>
+                    {myRole === 'viewer' && (
+                        <span className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                            <Eye className="w-3 h-3" />
+                            View Only
+                        </span>
+                    )}
                 </div>
             )}
+
+            {/* Permission denied toast */}
+            <AnimatePresence>
+                {permissionDenied && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-red-500/90 backdrop-blur-xl text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-medium text-sm"
+                    >
+                        <ShieldAlert className="w-4 h-4 shrink-0" />
+                        {permissionDenied}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* UI Overlays outside canvas stacking context */}
             {roomCode && (
@@ -112,7 +135,7 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                     <WorkspaceSettings 
                         roomCode={roomCode} 
                         isPrivate={isPrivate} 
-                        isCreator={isCreator} 
+                        myRole={myRole} 
                         roomUsers={roomUsers}
                     />
                     <ChatPanel roomId={roomCode} />
@@ -127,9 +150,10 @@ export default function BoardPage({ params }: { params: { roomId: string } }) {
                         cursors={cursors}
                         emitCursor={emitCursor}
                         lockedElements={lockedElements}
+                        myRole={myRole}
                     />
                 )}
-                <Toolbar />
+                <Toolbar myRole={myRole} />
                 <EmptyCanvas />
                 <Minimap />
             </div>

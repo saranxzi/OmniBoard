@@ -6,6 +6,8 @@ export type Point = { x: number; y: number; pressure?: number };
 
 export type AnchorSide = 'center' | 'top' | 'bottom' | 'left' | 'right';
 
+export type RoomRole = 'leader' | 'editor' | 'viewer';
+
 export interface ConnectionEndpoint {
     elementId: string;
     anchor: AnchorSide;
@@ -62,9 +64,11 @@ export interface ChatMessage {
     user: string;
     text: string;
     timestamp: number;
+    isBot?: boolean;
+    isStreaming?: boolean;
 }
 
 export interface RoomUsers {
     count: number;
-    users: { socketId: string; name: string }[];
+    users: { socketId: string; name: string; role?: RoomRole }[];
 }

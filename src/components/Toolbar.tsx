@@ -2,7 +2,7 @@
 
 import { 
     Undo2, Redo2, ZoomIn, ZoomOut, ImageDown, Trash2,
-    Sun, Moon, Magnet
+    Sun, Moon, Magnet, Lock
 } from 'lucide-react';
 import { useBoardStore, MIN_ZOOM, MAX_ZOOM } from '@/store/useBoardStore';
 import { getSocket } from '@/lib/socket';
@@ -10,12 +10,18 @@ import { useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TOOLS, COLORS, STROKE_WIDTHS } from '@/constants/board';
 import { createElement } from '@/lib/geometry';
+import { RoomRole } from '@/types';
+
+interface ToolbarProps {
+    myRole?: RoomRole;
+}
 
 /**
  * Toolbar — Modular drawing toolkit.
  * Centralizes tool selection, styling, canvas actions, dark mode, and snap settings.
+ * Respects role-based permissions: viewers see disabled tools, only leaders can clear.
  */
-export default function Toolbar() {
+export default function Toolbar({ myRole = 'editor' }: ToolbarProps) {
     const {
         activeTool, setActiveTool,
         currentColor, setCurrentColor,
@@ -27,6 +33,10 @@ export default function Toolbar() {
     } = useBoardStore();
 
     const { roomId } = useParams() as { roomId: string };
+
+    const isViewOnly = myRole === 'viewer';
+    const isLeader = myRole === 'leader';
+    const canWrite = myRole === 'leader' || myRole === 'editor';
 
     /** Export — capture all elements, not just viewport */
     const handleExport = () => {
@@ -82,6 +92,7 @@ export default function Toolbar() {
     const isDrawingTool = !['select', 'eraser', 'image'].includes(activeTool);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (isViewOnly) return;
         const file = e.target.files?.[0];
         if (!file) return;
 
@@ -133,7 +144,7 @@ export default function Toolbar() {
             className="fixed bottom-6 left-1/2 z-50 flex flex-col items-center gap-2.5 w-fit"
         >
             <AnimatePresence>
-                {isDrawingTool && (
+                {isDrawingTool && canWrite && (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -169,10 +180,10 @@ export default function Toolbar() {
             </AnimatePresence>
 
             <div className="bg-white/80 hover:bg-white backdrop-blur-2xl rounded-2xl shadow-xl border border-theme-light p-1.5 flex items-center gap-0.5 transition-colors">
-                <button onClick={undo} disabled={historyIndex === 0} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-theme-dark disabled:opacity-30 transition-all" title="Undo (Ctrl+Z)">
+                <button onClick={undo} disabled={historyIndex === 0 || isViewOnly} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-theme-dark disabled:opacity-30 transition-all" title="Undo (Ctrl+Z)">
                     <Undo2 className="w-[18px] h-[18px]" />
                 </button>
-                <button onClick={redo} disabled={historyIndex === history.length - 1} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-theme-dark disabled:opacity-30 transition-all" title="Redo (Ctrl+Y)">
+                <button onClick={redo} disabled={historyIndex === history.length - 1 || isViewOnly} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-theme-dark disabled:opacity-30 transition-all" title="Redo (Ctrl+Y)">
                     <Redo2 className="w-[18px] h-[18px]" />
                 </button>
 
@@ -185,27 +196,45 @@ export default function Toolbar() {
                     className="hidden" 
                     accept="image/*" 
                     onChange={handleImageUpload} 
+                    disabled={isViewOnly}
                 />
 
-                {TOOLS.map((tool) => (
-                    <button
-                        key={tool.type}
-                        onClick={() => {
-                            if (tool.type === 'image') {
-                                document.getElementById('toolbar-image-upload')?.click();
-                            } else {
-                                setActiveTool(tool.type);
-                            }
-                        }}
-                        className={`relative p-2.5 rounded-xl transition-all ${activeTool === tool.type ? 'text-theme-dark' : 'text-theme-dark/50 hover:bg-theme-lightest hover:text-theme-dark'}`}
-                        title={tool.label}
-                    >
-                        {activeTool === tool.type && (
-                            <motion.div layoutId="activeToolBg" className="absolute inset-0 bg-theme-light rounded-xl shadow-sm border border-theme-light" transition={{ type: "spring", stiffness: 300, damping: 30 }} />
-                        )}
-                        <tool.icon className="w-[18px] h-[18px] relative z-10" />
-                    </button>
-                ))}
+                {TOOLS.map((tool) => {
+                    // Determine if this tool is disabled for the user's role
+                    const isWriteTool = !['select'].includes(tool.type);
+                    const disabled = isViewOnly && isWriteTool;
+
+                    return (
+                        <button
+                            key={tool.type}
+                            onClick={() => {
+                                if (disabled) return;
+                                if (tool.type === 'image') {
+                                    document.getElementById('toolbar-image-upload')?.click();
+                                } else {
+                                    setActiveTool(tool.type);
+                                }
+                            }}
+                            className={`relative p-2.5 rounded-xl transition-all ${
+                                disabled 
+                                    ? 'text-theme-dark/20 cursor-not-allowed' 
+                                    : activeTool === tool.type 
+                                        ? 'text-theme-dark' 
+                                        : 'text-theme-dark/50 hover:bg-theme-lightest hover:text-theme-dark'
+                            }`}
+                            title={disabled ? `${tool.label} (View Only)` : tool.label}
+                            disabled={disabled}
+                        >
+                            {activeTool === tool.type && !disabled && (
+                                <motion.div layoutId="activeToolBg" className="absolute inset-0 bg-theme-light rounded-xl shadow-sm border border-theme-light" transition={{ type: "spring", stiffness: 300, damping: 30 }} />
+                            )}
+                            <tool.icon className="w-[18px] h-[18px] relative z-10" />
+                            {disabled && (
+                                <Lock className="w-2.5 h-2.5 absolute top-1 right-1 text-theme-dark/30" />
+                            )}
+                        </button>
+                    );
+                })}
 
                 <div className="w-px h-7 bg-theme-light mx-1" />
 
@@ -244,9 +273,13 @@ export default function Toolbar() {
                 <button onClick={handleExport} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-theme-dark transition-all" title="Export PNG">
                     <ImageDown className="w-[18px] h-[18px]" />
                 </button>
-                <button onClick={() => window.confirm('Clear canvas?') && (clearCanvas(), getSocket().emit('clear-canvas', roomId))} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-red-500 transition-all" title="Clear">
-                    <Trash2 className="w-[18px] h-[18px]" />
-                </button>
+
+                {/* Clear canvas — only for leader */}
+                {isLeader && (
+                    <button onClick={() => window.confirm('Clear canvas?') && (clearCanvas(), getSocket().emit('clear-canvas', roomId))} className="p-2.5 rounded-xl text-theme-dark/50 hover:text-red-500 transition-all" title="Clear Canvas">
+                        <Trash2 className="w-[18px] h-[18px]" />
+                    </button>
+                )}
             </div>
         </motion.div>
     );

@@ -6,7 +6,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useDrawingHandlers } from '@/hooks/useDrawingHandlers';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { CursorData, ElementLock } from '@/types';
+import { CursorData, ElementLock, RoomRole } from '@/types';
 
 /**
  * Board — the main collaborative canvas component.
@@ -18,10 +18,13 @@ interface BoardProps {
     cursors: Record<string, CursorData>;
     emitCursor: (x: number, y: number) => void;
     lockedElements?: Record<string, ElementLock>;
+    myRole?: RoomRole;
 }
 
-export default function Board({ roomCode, cursors, emitCursor, lockedElements = {} }: BoardProps) {
+export default function Board({ roomCode, cursors, emitCursor, lockedElements = {}, myRole = 'editor' }: BoardProps) {
     const { panOffset, zoom, currentColor } = useBoardStore();
+
+    const isViewOnly = myRole === 'viewer';
 
     // Canvas rendering — grid, elements, selection, handles, lock indicators
     useCanvasRenderer({ lockedElements });
@@ -42,20 +45,23 @@ export default function Board({ roomCode, cursors, emitCursor, lockedElements = 
             <canvas
                 id="canvas"
                 className="w-full h-full bg-theme-lightest touch-none block"
-                style={{ cursor: getCursorStyle() }}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
-                onClick={handleClick}
-                onDoubleClick={handleDoubleClick}
+                style={{ cursor: isViewOnly ? 'default' : getCursorStyle() }}
+                onPointerDown={isViewOnly ? undefined : handlePointerDown}
+                onPointerMove={(e) => {
+                    // Always track cursor for live cursors feature, even in view-only
+                    handlePointerMove(e);
+                }}
+                onPointerUp={isViewOnly ? undefined : handlePointerUp}
+                onPointerLeave={isViewOnly ? undefined : handlePointerUp}
+                onClick={isViewOnly ? undefined : handleClick}
+                onDoubleClick={isViewOnly ? undefined : handleDoubleClick}
                 onWheel={handleWheel}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
+                onDragOver={isViewOnly ? undefined : handleDragOver}
+                onDrop={isViewOnly ? undefined : handleDrop}
             />
 
             {/* Text input overlay (for text tool and sticky note editing) */}
-            {writingPosition && (
+            {writingPosition && !isViewOnly && (
                 <textarea
                     autoFocus
                     className="absolute m-0 p-0 border-0 outline-none bg-transparent whitespace-pre overflow-hidden resize-none"

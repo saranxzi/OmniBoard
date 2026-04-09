@@ -36,9 +36,14 @@ export default function Lobby() {
 
         if (res.ok) {
             const data = await res.json();
+            console.log('Room created successfully, navigating to:', data.code);
             router.push(`/board/${data.code}`);
+            // Force reset state after a short delay in case router.push hangs temporarily 
+            // but we still want the UI to be responsive if navigation completes slowly
+            setTimeout(() => setIsCreating(false), 3000);
         } else {
-            console.error('Failed to create room');
+            const errBody = await res.text();
+            console.error('Failed to create room:', res.status, errBody);
             setIsCreating(false);
         }
     } catch (e) {
