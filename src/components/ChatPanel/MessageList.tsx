@@ -48,7 +48,7 @@ export default function MessageList({ messages }: MessageListProps) {
                                 isStreaming ? 'ai-streaming' : ''
                             }`}>
                                 <div className="ai-message-text whitespace-pre-wrap break-words">
-                                    {msg.text || (isStreaming ? '' : '')}
+                                    {(msg.text || '').replace(/```json[\s\S]*?(```|$)/gi, '').trim() || (isStreaming ? '' : 'I have created the requested elements on the board for you!')}
                                     {isStreaming && <span className="ai-typing-cursor">▌</span>}
                                 </div>
                             </div>
